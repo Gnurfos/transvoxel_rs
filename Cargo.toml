@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 description = "Implementation of Eric Lengyel's Transvoxel Algorithm"
 repository = "https://github.com/Gnurfos/transvoxel_rs"
 categories = ["algorithms", "game-development", "graphics"]
-keywords = ["gamedev", "graphics", "voxel", "transvoxel", "marching-cubes", "isosurface", "3d"]
+keywords = ["gamedev", "voxel", "transvoxel", "marching-cubes", "isosurface"]
 
 [badges]
 maintenance = { status = "experimental" }
