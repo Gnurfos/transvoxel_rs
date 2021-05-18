@@ -29,7 +29,7 @@ bytemuck = { version = "*", optional = true }
 hamcrest = "*"
 ndarray = "*"
 bevy = { version = "0.5.0", features = ["dynamic"] }
-bevy_fly_camera = { version = "0.7.1", path = "../rust_misc/bevy_fly_camera" }
+bevy_fly_camera = { git = "https://github.com/Gnurfos/bevy_fly_camera", branch = "all" }
 bevy_egui = "0.4.2"
 bevy_screen_diags = "0.2.0"
 noise = "0.7.0"
