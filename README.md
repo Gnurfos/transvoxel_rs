@@ -1,5 +1,5 @@
 # Crate transvoxel
-Current version: 0.1.0
+Current version: 0.1.1
 
 ![Maintenance](https://img.shields.io/badge/maintenance-experimental-blue.svg)
 
@@ -12,7 +12,7 @@ Credits: Eric Lengyel's Transvoxel Algorithm. https://transvoxel.org/
 ## Brief description of the problem
 When extracting meshes with Marching Cubes for adjacent blocks at different level of detail independently, the meshes generally do not match at the blocks' junctions, inducing visible holes:
 ![gap-solid](https://gnurfos.github.io/transvoxel_rs/doc-images/gap-solid.png)
-![gap-wireframe](https://gnurfos.github.io/transvoxel_rs/doc-images/fixed-wireframe.png)
+![gap-wireframe](https://gnurfos.github.io/transvoxel_rs/doc-images/gap-wireframe.png)
 The Transvoxel Algorithm allows generating a mesh for a block *mostly* with marching cubes, but with increased detail on one or several external faces of the block, in order to match with neighbouring blocks' meshes:
 ![fixed-wireframe](https://gnurfos.github.io/transvoxel_rs/doc-images/fixed-wireframe.png)
 
@@ -28,6 +28,7 @@ To implement a fully consistent dynamic level-of-detail system, you will also pr
 Currently, it is not possible to "flip" a transition face status on a block, without re-extracting a new mesh for the block. Which means changing the resolution for one block can cascade through constraints to re-generating a few other blocks as well
 
 ## Basic usage
+Either try calling one of the functions in [extraction], or follow the example below:
 ```rust
 // The first thing you need is a density provider. You can implement a ScalarField for that
 // but a simpler way, if you are just experimenting, is to use a function:

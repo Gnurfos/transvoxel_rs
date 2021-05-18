@@ -17,7 +17,7 @@ Arguments:
  * `block`: the world zone for which to extract, and its subdivisions count
  * `threshold`: density value defining the iso-surface
  * `transition_sides`: the set of sides of the block which need to be adapted to neighbour double-resolution blocks (twice the subdivisions)
-*/
+ */
 pub fn extract<D, S>(
     source: S,
     block: &Block,

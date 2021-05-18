@@ -1,6 +1,6 @@
 [package]
 name = "transvoxel"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Seb E. <seb@nospam.org>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -8,6 +8,9 @@ description = "Implementation of Eric Lengyel's Transvoxel Algorithm"
 repository = "https://github.com/Gnurfos/transvoxel_rs"
 categories = ["algorithms", "game-development", "graphics"]
 keywords = ["gamedev", "voxel", "transvoxel", "marching-cubes", "isosurface"]
+
+[package.metadata.docs.rs]
+rustc-args = ["--cfg", "docsrs"]
 
 [badges]
 maintenance = { status = "experimental" }

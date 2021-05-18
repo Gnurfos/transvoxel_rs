@@ -1,3 +1,6 @@
+/*!
+Mapping system between XYZ and UVW coordinates
+*/
 use super::super::structs::*;
 use super::super::transition_sides::*;
 use super::super::voxel_coordinates::*;
@@ -10,14 +13,25 @@ pub struct XYZ {
     pub z: isize,
 }
 #[derive(Debug)]
+/**
+Rotation information for one of the 6 [TransitionSide]
+*/
 pub struct Rotation {
+    /// The side is just stored along here for convenience
     pub side: TransitionSide,
+    /// Where the origin of the UVW system is, in the XYZ system. It is used both for cells and blocks. 0 is at the lowest of the cell or block, 1 at the highest
     pub uvw_base: XYZ,
+    /// The direction of the U unit vector, in the XYZ system. Components can be -1 0 or 1
     pub u: XYZ,
+    /// The direction of the V unit vector, in the XYZ system. Components can be -1 0 or 1
     pub v: XYZ,
+    /// The direction of the W unit vector, in the XYZ system. Components can be -1 0 or 1
     pub w: XYZ,
+    /// The direction of the X unit vector, in the UVW system. Components can be -1 0 or 1
     pub plus_x_as_uvw: HighResolutionVoxelDelta,
+    /// The direction of the Y unit vector, in the UVW system. Components can be -1 0 or 1
     pub plus_y_as_uvw: HighResolutionVoxelDelta,
+    /// The direction of the Z unit vector, in the UVW system. Components can be -1 0 or 1
     pub plus_z_as_uvw: HighResolutionVoxelDelta,
 }
 

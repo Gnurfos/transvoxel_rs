@@ -20,6 +20,18 @@ pub struct BlockDims {
 /**
 A [Block] with attached number of subdivisions for the extraction
 With n subdivisions, the block will contain n cells, encompassing n + 1 voxels across each dimension
+```
+# use transvoxel::structs::*;
+// Just meant to be constructed and passed around
+let a_block = Block {
+    dims: BlockDims {
+        base: [10.0, 20.0, 30.0],
+        size: 10.0,
+    },
+    subdivisions: 8,
+};
+let another_block = Block::from([10.0, 20.0, 30.0], 10.0, 8);
+```
 */
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Block {
