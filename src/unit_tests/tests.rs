@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::env;
 
 use crate::transition_sides::*;
@@ -343,7 +344,7 @@ fn simple_sphere() {
 }
 
 struct CountingField<'b, S> {
-    pub calls: usize,
+    pub calls: RefCell<usize>,
     underlying: WorldMappingVoxelSource<'b, S>,
 }
 impl<'b, C> CountingField<'b, ScalarFieldForFn<C>> {
@@ -353,9 +354,12 @@ impl<'b, C> CountingField<'b, ScalarFieldForFn<C>> {
             block: block,
         };
         Self {
-            calls: 0,
+            calls: RefCell::new(0),
             underlying: underlying,
         }
+    }
+    pub fn count(&self) -> usize {
+        *self.calls.borrow()
     }
 }
 #[allow(unused_variables)]
@@ -363,13 +367,13 @@ impl<'b, S> VoxelSource<f32> for CountingField<'b, S>
 where
     S: ScalarField<f32>,
 {
-    fn get_density(&mut self, voxel_index: &RegularVoxelIndex) -> f32 {
-        self.calls += 1;
+    fn get_density(&self, voxel_index: &RegularVoxelIndex) -> f32 {
+        *self.calls.borrow_mut() += 1;
         self.underlying.get_density(voxel_index)
     }
 
-    fn get_transition_density(&mut self, index: &HighResolutionVoxelIndex) -> f32 {
-        self.calls += 1;
+    fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> f32 {
+        *self.calls.borrow_mut() += 1;
         self.underlying.get_transition_density(index)
     }
 }
@@ -382,12 +386,12 @@ fn count_density_calls_minimal() {
     let mut source = CountingField::new(|_, _, _| 0.0, &block);
     extract(&mut source, &block, 0.5, no_side());
     // Just query each voxel once for finding the case
-    assert_that!(source.calls, equal_to(8));
+    assert_that!(source.count(), equal_to(8));
     // With one transition
     let mut source = CountingField::new(|_, _, _| 0.0, &block);
     extract(&mut source, &block, 0.5, TransitionSide::LowX.into());
     // Just query each voxel once for finding the case, but needs the high-res- face voxels too
-    assert_that!(source.calls, equal_to(13));
+    assert_that!(source.count(), equal_to(13));
     // With two transition sides
     let mut source = CountingField::new(|_, _, _| 0.0, &block);
     extract(
@@ -397,7 +401,7 @@ fn count_density_calls_minimal() {
         (TransitionSide::LowX | TransitionSide::LowZ).into(),
     );
     // Just query each voxel once for finding the case, but needs the 2 high-res face voxels too
-    assert_that!(source.calls, equal_to(18));
+    assert_that!(source.count(), equal_to(18));
 }
 
 #[test]
@@ -409,8 +413,8 @@ fn count_density_calls_random() {
     extract(&mut source, &block, 0.5, no_side());
     // Min: 4x4x4 for determining the case
     // Max: 4x4x4 for the case + 6x4x4 (extending outside in each of the 6 directions, for each of the  4x4 voxels on the side)
-    assert_that!(source.calls, greater_than_or_equal_to(4 * 4 * 4));
-    assert_that!(source.calls, less_than_or_equal_to(4 * 4 * 4 + 6 * 4 * 4));
+    assert_that!(source.count(), greater_than_or_equal_to(4 * 4 * 4));
+    assert_that!(source.count(), less_than_or_equal_to(4 * 4 * 4 + 6 * 4 * 4));
     // With one transition
     let mut source = CountingField::new(&|_, _, _| rand::random(), &block);
     extract(&mut source, &block, 0.5, TransitionSide::LowX.into());

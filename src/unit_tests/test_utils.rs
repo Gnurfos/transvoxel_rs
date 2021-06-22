@@ -411,7 +411,7 @@ where
 }
 
 impl<D: Default + Density + Copy> VoxelSource<D> for DensityArray<D> {
-    fn get_density(&mut self, voxel_index: &RegularVoxelIndex) -> D {
+    fn get_density(&self, voxel_index: &RegularVoxelIndex) -> D {
         self.data[[
             (voxel_index.x + 1) as usize,
             (voxel_index.y + 1) as usize,
@@ -420,7 +420,7 @@ impl<D: Default + Density + Copy> VoxelSource<D> for DensityArray<D> {
     }
 
     #[allow(unused_variables, unused_mut)]
-    fn get_transition_density(&mut self, index: &HighResolutionVoxelIndex) -> D {
+    fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D {
         let side = index.cell.side;
         if (index.delta.u % 2 != 0) || (index.delta.v % 2 != 0) {
             return self.get_inter(

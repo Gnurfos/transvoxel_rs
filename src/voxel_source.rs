@@ -26,14 +26,14 @@ pub trait VoxelSource<D: Density> {
      *  - the function can be called for index values between -1 and `subdivisions` + 1 (both included)
      *
      */
-    fn get_density(&mut self, voxel_index: &RegularVoxelIndex) -> D;
+    fn get_density(&self, voxel_index: &RegularVoxelIndex) -> D;
 
     /**
     If the extraction needs to handle some transition faces, this method will be called to get density for non regular voxels
     It will only get called for non-regular voxels (ie odd u/v and/or non-zero w): For example for U=2,V=0,W=0 the algorithm
     will try to call `get_density` instead
     */
-    fn get_transition_density(&mut self, index: &HighResolutionVoxelIndex) -> D;
+    fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D;
 }
 
 /**
@@ -55,7 +55,7 @@ where
     D: Density,
     S: ScalarField<D>,
 {
-    fn get_density(&mut self, voxel_index: &RegularVoxelIndex) -> D {
+    fn get_density(&self, voxel_index: &RegularVoxelIndex) -> D {
         let x = self.block.dims.base[0]
             + self.block.dims.size * voxel_index.x as f32 / self.block.subdivisions as f32;
         let y = self.block.dims.base[1]
@@ -66,7 +66,7 @@ where
         d
     }
 
-    fn get_transition_density(&mut self, index: &HighResolutionVoxelIndex) -> D {
+    fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D {
         let rotation = super::implementation::rotation::Rotation::for_side(index.cell.side);
         let position_in_block = rotation.to_position_in_block(self.block.subdivisions, index);
         let x = self.block.dims.base[0]
@@ -88,11 +88,11 @@ where
     D: Density,
     F: VoxelSource<D> + ?Sized,
 {
-    fn get_density(&mut self, voxel_index: &RegularVoxelIndex) -> D {
+    fn get_density(&self, voxel_index: &RegularVoxelIndex) -> D {
         (**self).get_density(voxel_index)
     }
 
-    fn get_transition_density(&mut self, index: &HighResolutionVoxelIndex) -> D {
+    fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D {
         (**self).get_transition_density(index)
     }
 }

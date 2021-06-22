@@ -199,7 +199,7 @@ where
     D: Density,
     S: VoxelSource<D>,
 {
-    fn get_density(&mut self, voxel_index: &RegularVoxelIndex) -> D {
+    fn get_density(&self, voxel_index: &RegularVoxelIndex) -> D {
         let x = voxel_index.x;
         let y = voxel_index.y;
         let z = voxel_index.z;
@@ -243,7 +243,7 @@ where
         }
     }
 
-    fn get_transition_density(&mut self, index: &HighResolutionVoxelIndex) -> D {
+    fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D {
         let c = index.cell;
         let d = index.delta;
         let subs = self.block_subdivisions as isize;

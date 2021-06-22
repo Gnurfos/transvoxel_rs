@@ -134,17 +134,12 @@ assert!(sides.contains(TransitionSide::LowX));
 assert!(!sides.contains(TransitionSide::HighX));
 ```
 
-# Remarks
- * Although they are a data source, the fields are mutable, in case you want to do smart things while generating densities (like your own caching)
- * You should balance the amount of subdivisions and the size of your blocks: too few subdivisions means you will need to produce many smaller blocks and meshes. Too many means you will have big meshes. Also, the algorithm currently fetches several times the density for some voxels during a single extraction, so this might add overhead too.
-
 # Limitations / possible improvements
  * Provide a way to extract without normals, or with face normals, which would be much faster
  * Output/Input positions/normals are only f32. It should be feasible easily to extend that to f64
  * [Density] is limited to [Float] at the moment (only implemented for f32 and could be easily extended to f64). Some thinking would be needed for allowing more types, regarding interactions with gradients and interpolation of coordinates
  * Voxel densities caching is sub-optimal: probably only in the case of an empty block will densities be queried only once per voxel. In non-empty blocks, densities are very likely to be queried several times for some voxels
  * Algorithm improvements. See [Algorithm]
- * Do not require mutability from ScalarField and VoxelSource
 
 [Algorithm]: crate::implementation::algorithm
 [Density]: crate::density::Density
