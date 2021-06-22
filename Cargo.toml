@@ -11,6 +11,7 @@ keywords = ["gamedev", "voxel", "transvoxel", "marching-cubes", "isosurface"]
 
 [package.metadata.docs.rs]
 rustc-args = ["--cfg", "docsrs"]
+features = ["bevy_mesh"]
 
 [badges]
 maintenance = { status = "experimental" }
