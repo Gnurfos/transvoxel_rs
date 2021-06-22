@@ -1,6 +1,8 @@
 /*!
 Main mesh extraction methods
 */
+use std::cell::RefCell;
+
 use super::implementation::algorithm::Extractor;
 use super::structs::*;
 use super::{
@@ -71,9 +73,27 @@ pub fn extract_from_fn<D, F>(
 ) -> Mesh
 where
     D: Density,
-    F: FnMut(f32, f32, f32) -> D,
+    F: Fn(f32, f32, f32) -> D,
 {
     let field = ScalarFieldForFn(f);
+    let mut source = WorldMappingVoxelSource { field, block };
+    Extractor::new(&mut source, block, threshold, transition_sides).extract()
+}
+
+/**
+Same as  [extract_from_fn] for mutable closures
+*/
+pub fn extract_from_fnmut<D, F>(
+    f: F,
+    block: &Block,
+    threshold: D,
+    transition_sides: TransitionSides,
+) -> Mesh
+where
+    D: Density,
+    F: FnMut(f32, f32, f32) -> D,
+{
+    let field = ScalarFieldForFnMut(RefCell::new(f));
     let mut source = WorldMappingVoxelSource { field, block };
     Extractor::new(&mut source, block, threshold, transition_sides).extract()
 }

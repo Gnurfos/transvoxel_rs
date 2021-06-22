@@ -5,7 +5,7 @@ use transvoxel::transition_sides::TransitionSide;
 
 struct Sphere;
 impl ScalarField<f32> for Sphere {
-    fn get_density(&mut self, x: f32, y: f32, z: f32) -> f32 {
+    fn get_density(&self, x: f32, y: f32, z: f32) -> f32 {
         sphere_density(x, y, z)
     }
 }

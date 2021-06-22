@@ -2,6 +2,8 @@
     Density traits and storage facilities used by the extraction algorithm
 */
 
+use std::cell::RefCell;
+
 use num::Float;
 
 /**
@@ -60,7 +62,7 @@ pub trait ScalarField<D> {
     /**
     Obtain the density at the given point in space
     */
-    fn get_density(&mut self, x: f32, y: f32, z: f32) -> D;
+    fn get_density(&self, x: f32, y: f32, z: f32) -> D;
 }
 
 /**
@@ -70,7 +72,7 @@ impl<D, F> ScalarField<D> for &mut F
 where
     F: ScalarField<D> + ?Sized,
 {
-    fn get_density(&mut self, x: f32, y: f32, z: f32) -> D {
+    fn get_density(&self, x: f32, y: f32, z: f32) -> D {
         (**self).get_density(x, y, z)
     }
 }
@@ -86,9 +88,27 @@ ScalarField implementation for closures
  */
 impl<F, D> ScalarField<D> for ScalarFieldForFn<F>
 where
+    F: Fn(f32, f32, f32) -> D,
+{
+    fn get_density(&self, x: f32, y: f32, z: f32) -> D {
+        self.0(x, y, z)
+    }
+}
+
+/**
+Wrapper for using mutable closures as [ScalarField]
+We need the newtype wrapping because we implement ScalarField for &ScalarField too, and that would conflict without the wrapping
+*/
+pub struct ScalarFieldForFnMut<F>(pub RefCell<F>);
+
+/**
+ScalarField implementation for mutable closures
+ */
+impl<F, D> ScalarField<D> for ScalarFieldForFnMut<F>
+where
     F: FnMut(f32, f32, f32) -> D,
 {
-    fn get_density(&mut self, x: f32, y: f32, z: f32) -> D {
-        self.0(x, y, z)
+    fn get_density(&self, x: f32, y: f32, z: f32) -> D {
+        self.0.borrow_mut()(x, y, z)
     }
 }

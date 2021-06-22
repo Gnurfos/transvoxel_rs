@@ -2,7 +2,7 @@ use std::env;
 
 use crate::transition_sides::*;
 use crate::unit_tests::test_utils::*;
-use crate::{density::*, extraction::extract_from_fn};
+use crate::{density::*, extraction::extract_from_fnmut};
 use crate::{
     extraction::extract,
     voxel_source::{VoxelSource, WorldMappingVoxelSource},
@@ -304,7 +304,7 @@ fn simple_sphere() {
     // Radius = 5, that is with threshold 0, density is 0 at 5 and 15, positive between them, negative outside
     struct Sphere;
     impl ScalarField<f32> for Sphere {
-        fn get_density(&mut self, x: f32, y: f32, z: f32) -> f32 {
+        fn get_density(&self, x: f32, y: f32, z: f32) -> f32 {
             let distance_from_center =
                 ((x - 10f32) * (x - 10f32) + (y - 10f32) * (y - 10f32) + (z - 10f32) * (z - 10f32))
                     .sqrt();
@@ -431,7 +431,7 @@ fn random_data() {
     let block = Block::from([0.0, 0.0, 0.0], 10.0, subdivisions);
     let sides = random_sides(&mut rng);
     let source = |_, _, _| rng.gen_range(-1.0..1.0);
-    let m = extract_from_fn(source, &block, 0.5, sides);
+    let m = extract_from_fnmut(source, &block, 0.5, sides);
     println!(
         "Extracted mesh with {} tris for sides {:?}",
         m.num_tris(),
