@@ -47,13 +47,10 @@ A point on the grid, for output purposes.
 This is not necessarily at the same place as a Voxel sample, because grid points can be shifted ("shrink")
 */
 struct GridPoint<D: Density> {
-    position: Position,
-    gradient: (D, D, D),
+    position: Position<D::F>,
+    gradient: (D::F, D::F, D::F),
     density: D,
 }
-
-/// Relative depth of a transition cell
-pub const SHRINK_FACTOR: f32 = 0.15;
 
 pub struct Extractor<'b, D, S>
 where
@@ -61,12 +58,12 @@ where
     S: VoxelSource<D>,
 {
     density_source: PreCachingVoxelSource<D, S>,
-    block: &'b Block,
+    block: &'b Block<D::F>,
     threshold: D,
     transition_sides: TransitionSides,
     vertices: usize,
-    vertices_positions: Vec<f32>,
-    vertices_normals: Vec<f32>,
+    vertices_positions: Vec<D::F>,
+    vertices_normals: Vec<D::F>,
     tri_indices: Vec<usize>,
     shared_storage: SharedVertexIndices,
     current_rotation: &'static Rotation,
@@ -79,7 +76,7 @@ where
 {
     pub fn new(
         density_source: S,
-        block: &'b Block,
+        block: &'b Block<D::F>,
         threshold: D,
         transition_sides: TransitionSides,
     ) -> Self {
@@ -97,13 +94,13 @@ where
         }
     }
 
-    pub fn extract(mut self) -> Mesh {
+    pub fn extract(mut self) -> Mesh<D::F> {
         self.extract_regular_cells();
         self.extract_transition_cells();
         return self.output_mesh();
     }
 
-    fn output_mesh(self) -> Mesh {
+    fn output_mesh(self) -> Mesh<D::F> {
         return Mesh {
             positions: self.vertices_positions,
             normals: self.vertices_normals,
@@ -210,7 +207,7 @@ where
         let mut case: usize = 0;
         for (i, deltas) in REGULAR_CELL_VOXELS.iter().enumerate() {
             let voxel_index = cell_index + deltas;
-            let inside = self.regular_voxel_density(&voxel_index) > self.threshold;
+            let inside = self.regular_voxel_density(&voxel_index).inside();
             if inside {
                 case += 1 << i;
             }
@@ -223,7 +220,7 @@ where
         for (voxel_delta, contribution) in TRANSITION_HIGH_RES_FACE_CASE_CONTRIBUTIONS.iter() {
             let voxel_index = cell_index + voxel_delta;
             let density = self.transition_grid_point_density(&voxel_index);
-            let inside = density > self.threshold;
+            let inside = density.inside();
             if inside {
                 case += contribution;
             }
@@ -360,27 +357,27 @@ where
         };
     }
 
-    fn regular_grid_point_position(&self, voxel_index: &RegularVoxelIndex) -> Position {
+    fn regular_grid_point_position(&self, voxel_index: &RegularVoxelIndex) -> Position<D::F> {
         let mut x = self.block.dims.base[0]
-            + voxel_index.x as f32 * self.block.dims.size / self.block.subdivisions as f32;
+            + self.block.dims.size * D::F::from_ratio(voxel_index.x, self.block.subdivisions);
         let mut y = self.block.dims.base[1]
-            + voxel_index.y as f32 * self.block.dims.size / self.block.subdivisions as f32;
+            + self.block.dims.size * D::F::from_ratio(voxel_index.y, self.block.subdivisions);
         let mut z = self.block.dims.base[2]
-            + voxel_index.z as f32 * self.block.dims.size / self.block.subdivisions as f32;
+            + self.block.dims.size * D::F::from_ratio(voxel_index.z, self.block.subdivisions);
         self.shrink_if_needed(&mut x, &mut y, &mut z, &voxel_index);
         Position { x: x, y: y, z: z }
     }
 
-    fn regular_voxel_gradient(&mut self, voxel_index: &RegularVoxelIndex) -> (D, D, D) {
-        let xgradient = self
-            .regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: 1, y: 0, z: 0 }))
-            - self.regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: -1, y: 0, z: 0 }));
-        let ygradient = self
-            .regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: 0, y: 1, z: 0 }))
-            - self.regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: 0, y: -1, z: 0 }));
-        let zgradient = self
-            .regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: 0, y: 0, z: 1 }))
-            - self.regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: 0, y: 0, z: -1 }));
+    fn regular_voxel_gradient(&mut self, voxel_index: &RegularVoxelIndex) -> (D::F, D::F, D::F) {
+        let xgradient =
+            self.regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: 1, y: 0, z: 0 }))
+            .diff(self.regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: -1, y: 0, z: 0 })));
+        let ygradient =
+            self.regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: 0, y: 1, z: 0 }))
+            .diff(self.regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: 0, y: -1, z: 0 })));
+        let zgradient =
+            self.regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: 0, y: 0, z: 1 }))
+            .diff(self.regular_voxel_density(&(voxel_index + RegularVoxelDelta { x: 0, y: 0, z: -1 })));
         (xgradient, ygradient, zgradient)
     }
 
@@ -431,19 +428,18 @@ where
         &self,
         cell_index: &TransitionCellIndex,
         delta: HighResolutionVoxelDelta,
-    ) -> Position {
+    ) -> Position<D::F> {
         let rot = self.current_rotation;
-        let cell_size = self.block.dims.size / self.block.subdivisions as f32;
         let voxel_index = cell_index + &delta;
         let position_in_block = rot.to_position_in_block(self.block.subdivisions, &voxel_index);
-        let world_position = &(&position_in_block * cell_size) + &self.block.dims.base;
+        let world_position = &(&position_in_block * self.block.dims.size) + &self.block.dims.base;
         world_position
     }
 
     fn high_res_face_grid_point_gradient(
         &mut self,
         base_voxel_index: &HighResolutionVoxelIndex,
-    ) -> (D, D, D) {
+    ) -> (D::F, D::F, D::F) {
         // This might not be correct, and we might want to only use high-res steps for the gradients,
         // even for voxels at the corners of the face (to better match normals with the neighbouring block)
         if base_voxel_index.on_regular_grid() {
@@ -458,17 +454,17 @@ where
     fn high_res_face_grid_point_gradient_non_regular(
         &mut self,
         base_voxel_index: &HighResolutionVoxelIndex,
-    ) -> (D, D, D) {
+    ) -> (D::F, D::F, D::F) {
         let rot = self.current_rotation;
-        let x_gradient = self
-            .transition_grid_point_density(&(base_voxel_index + &rot.plus_x_as_uvw))
-            - self.transition_grid_point_density(&(base_voxel_index - &rot.plus_x_as_uvw));
-        let y_gradient = self
-            .transition_grid_point_density(&(base_voxel_index + &rot.plus_y_as_uvw))
-            - self.transition_grid_point_density(&(base_voxel_index - &rot.plus_y_as_uvw));
-        let z_gradient = self
-            .transition_grid_point_density(&(base_voxel_index + &rot.plus_z_as_uvw))
-            - self.transition_grid_point_density(&(base_voxel_index - &rot.plus_z_as_uvw));
+        let x_gradient =
+            self.transition_grid_point_density(&(base_voxel_index + &rot.plus_x_as_uvw))
+            .diff(self.transition_grid_point_density(&(base_voxel_index - &rot.plus_x_as_uvw)));
+        let y_gradient =
+            self.transition_grid_point_density(&(base_voxel_index + &rot.plus_y_as_uvw))
+            .diff(self.transition_grid_point_density(&(base_voxel_index - &rot.plus_y_as_uvw)));
+        let z_gradient =
+            self.transition_grid_point_density(&(base_voxel_index + &rot.plus_z_as_uvw))
+            .diff(self.transition_grid_point_density(&(base_voxel_index - &rot.plus_z_as_uvw)));
         (x_gradient, y_gradient, z_gradient)
     }
 
@@ -477,10 +473,10 @@ where
     }
 
     fn add_vertex_between(&mut self, point_a: GridPoint<D>, point_b: GridPoint<D>) -> usize {
-        let interp_toward_b: D = D::interp(&point_a.density, &point_b.density, &self.threshold);
+        let interp_toward_b = D::interp(&point_a.density, &point_b.density, &self.threshold);
         let position = point_a
             .position
-            .interp_toward(&point_b.position, interp_toward_b.as_f32());
+            .interp_toward(&point_b.position, interp_toward_b);
         let gradient_x =
             point_a.gradient.0 + interp_toward_b * (point_b.gradient.0 - point_a.gradient.0);
         let gradient_y =
@@ -501,13 +497,13 @@ where
 
     fn shrink_if_needed(
         &self,
-        grid_point_x: &mut f32,
-        grid_point_y: &mut f32,
-        grid_point_z: &mut f32,
+        grid_point_x: &mut D::F,
+        grid_point_y: &mut D::F,
+        grid_point_z: &mut D::F,
         voxel_index: &RegularVoxelIndex,
     ) {
-        let cell_size = self.block.dims.size / self.block.subdivisions as f32;
-        shrink_if_needed(
+        let cell_size = self.block.dims.size * D::F::from_ratio(1, self.block.subdivisions);
+        shrink_if_needed::<D>(
             grid_point_x,
             grid_point_y,
             grid_point_z,
@@ -598,39 +594,39 @@ impl SharedVertexIndices {
 }
 
 /// This function is only made public for our examples, to display the voxel grid. Regular users should not need it
-pub fn shrink_if_needed(
-    x: &mut f32,
-    y: &mut f32,
-    z: &mut f32,
+pub fn shrink_if_needed<D: Density>(
+    x: &mut D::F,
+    y: &mut D::F,
+    z: &mut D::F,
     xi: isize,
     yi: isize,
     zi: isize,
-    cell_size: f32,
+    cell_size: D::F,
     subdivisions: usize,
     transition_sides: &TransitionSides,
 ) {
-    let shrink = SHRINK_FACTOR * cell_size;
+    let shrink: D::F = D::shrink_factor() * cell_size;
     if can_shrink(xi, yi, zi, subdivisions, transition_sides) {
         if (xi == 0) && (transition_sides.contains(TransitionSide::LowX)) {
-            *x += shrink;
+            *x = *x + shrink;
         } else if (xi as usize == subdivisions)
             && (transition_sides.contains(TransitionSide::HighX))
         {
-            *x -= shrink;
+            *x = *x - shrink;
         }
         if (yi == 0) && (transition_sides.contains(TransitionSide::LowY)) {
-            *y += shrink;
+            *y = *y + shrink;
         } else if (yi as usize == subdivisions)
             && (transition_sides.contains(TransitionSide::HighY))
         {
-            *y -= shrink;
+            *y = *y - shrink;
         }
         if (zi == 0) && (transition_sides.contains(TransitionSide::LowZ)) {
-            *z += shrink;
+            *z = *z + shrink;
         } else if (zi as usize == subdivisions)
             && (transition_sides.contains(TransitionSide::HighZ))
         {
-            *z -= shrink;
+            *z = *z - shrink;
         }
     }
 }

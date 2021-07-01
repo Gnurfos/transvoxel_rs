@@ -13,8 +13,8 @@ pub enum Model {
     Noise,
 }
 
-pub fn models_map() -> HashMap<Model, Box<dyn ScalarField<f32>>> {
-    let mut fields: HashMap<Model, Box<dyn ScalarField<f32>>> = HashMap::new();
+pub fn models_map() -> HashMap<Model, Box<dyn ScalarField<f32, f32>>> {
+    let mut fields: HashMap<Model, Box<dyn ScalarField<f32, f32>>> = HashMap::new();
     fields.insert(
         Model::Sphere,
         Box::new(Sphere {
@@ -61,8 +61,8 @@ struct Sphere {
     pub r: f32,
 }
 
-impl ScalarField<f32> for Sphere {
-    fn get_density(&mut self, x: f32, y: f32, z: f32) -> f32 {
+impl ScalarField<f32, f32> for Sphere {
+    fn get_density(&self, x: f32, y: f32, z: f32) -> f32 {
         let distance_from_center = ((x - self.cx) * (x - self.cx)
             + (y - self.cy) * (y - self.cy)
             + (z - self.cz) * (z - self.cz))
@@ -73,16 +73,16 @@ impl ScalarField<f32> for Sphere {
 }
 
 struct ObliquePlane {}
-impl ScalarField<f32> for ObliquePlane {
+impl ScalarField<f32, f32> for ObliquePlane {
     #[allow(unused_variables)]
-    fn get_density(&mut self, x: f32, y: f32, z: f32) -> f32 {
+    fn get_density(&self, x: f32, y: f32, z: f32) -> f32 {
         2f32 + z - 2f32 * y
     }
 }
 
 struct Wave {}
-impl ScalarField<f32> for Wave {
-    fn get_density(&mut self, x: f32, y: f32, z: f32) -> f32 {
+impl ScalarField<f32, f32> for Wave {
+    fn get_density(&self, x: f32, y: f32, z: f32) -> f32 {
         2.0 * ((x * 1.0).sin() + 0.5 * (z * 0.5).cos()) + 5.0 - y
     }
 }
@@ -97,8 +97,8 @@ impl Noise {
         }
     }
 }
-impl ScalarField<f32> for Noise {
-    fn get_density(&mut self, x: f32, y: f32, z: f32) -> f32 {
+impl ScalarField<f32, f32> for Noise {
+    fn get_density(&self, x: f32, y: f32, z: f32) -> f32 {
         let distrub = self.f.get([x as f64, y as f64, z as f64]) as f32;
         2f32 - 2f32 * (y - 3.0 - 3.0 * distrub)
     }

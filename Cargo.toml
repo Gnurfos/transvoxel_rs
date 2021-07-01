@@ -22,7 +22,7 @@ bevy_mesh = ["bevy", "bytemuck"]
 
 [dependencies]
 flagset = "0.4"
-num = "0.1"
+num = "0.4"
 transvoxel-data = "0.2"
 serde = { version = "1.0", optional = true, features = ["derive"] }
 bevy = { version = "0.5", optional = true }

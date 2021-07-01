@@ -22,10 +22,10 @@ Arguments:
  */
 pub fn extract<D, S>(
     source: S,
-    block: &Block,
+    block: &Block<D::F>,
     threshold: D,
     transition_sides: TransitionSides,
-) -> Mesh
+) -> Mesh<D::F>
 where
     D: Density,
     S: VoxelSource<D>,
@@ -42,15 +42,15 @@ Arguments:
  * `threshold`: density value defining the iso-surface
  * `transition_sides`: the set of sides of the block which need to be adapted to neighbour double-resolution blocks (twice the subdivisions)
 */
-pub fn extract_from_field<D, F>(
-    field: F,
-    block: &Block,
+pub fn extract_from_field<D, FIELD>(
+    field: FIELD,
+    block: &Block<D::F>,
     threshold: D,
     transition_sides: TransitionSides,
-) -> Mesh
+) -> Mesh<D::F>
 where
     D: Density,
-    F: ScalarField<D>,
+    FIELD: ScalarField<D, D::F>, // TODO simplify, only need 1 parameter
 {
     let mut source = WorldMappingVoxelSource { field, block };
     Extractor::new(&mut source, block, threshold, transition_sides).extract()
@@ -65,15 +65,15 @@ Arguments:
  * `threshold`: density value defining the iso-surface
  * `transition_sides`: the set of sides of the block which need to be adapted to neighbour double-resolution blocks (twice the subdivisions)
 */
-pub fn extract_from_fn<D, F>(
-    f: F,
-    block: &Block,
+pub fn extract_from_fn<D, FUN>(
+    f: FUN,
+    block: &Block<D::F>,
     threshold: D,
     transition_sides: TransitionSides,
-) -> Mesh
+) -> Mesh<D::F>
 where
     D: Density,
-    F: Fn(f32, f32, f32) -> D,
+    FUN: Fn(D::F, D::F, D::F) -> D,
 {
     let field = ScalarFieldForFn(f);
     let mut source = WorldMappingVoxelSource { field, block };
@@ -83,15 +83,15 @@ where
 /**
 Same as  [extract_from_fn] for mutable closures
 */
-pub fn extract_from_fnmut<D, F>(
-    f: F,
-    block: &Block,
+pub fn extract_from_fnmut<D, FUN>(
+    f: FUN,
+    block: &Block<D::F>,
     threshold: D,
     transition_sides: TransitionSides,
-) -> Mesh
+) -> Mesh<D::F>
 where
     D: Density,
-    F: FnMut(f32, f32, f32) -> D,
+    FUN: FnMut(D::F, D::F, D::F) -> D,
 {
     let field = ScalarFieldForFnMut(RefCell::new(f));
     let mut source = WorldMappingVoxelSource { field, block };

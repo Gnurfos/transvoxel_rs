@@ -19,7 +19,7 @@ use shapes::create_arrow;
 #[path = "../shared/utils.rs"]
 mod utils;
 
-const MAIN_BLOCK: BlockDims = BlockDims {
+const MAIN_BLOCK: BlockDims<f32> = BlockDims {
     base: [0.0, 0.0, 0.0],
     size: 10.0,
 };

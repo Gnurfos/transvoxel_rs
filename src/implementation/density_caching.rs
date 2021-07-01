@@ -41,7 +41,7 @@ where
     fn load_regular_block_voxels(&mut self) {
         let subs = self.block_subdivisions;
         self.regular_cache
-            .resize((subs + 1) * (subs + 1) * (subs + 1), D::zero());
+            .resize((subs + 1) * (subs + 1) * (subs + 1), D::default());
         for x in 0..=subs {
             for y in 0..=subs {
                 for z in 0..=subs {
@@ -69,7 +69,7 @@ where
         }
         let subs = self.block_subdivisions;
         let face_size = (subs + 1) * (subs + 1);
-        self.regular_cache_extended.resize(6 * face_size, D::zero());
+        self.regular_cache_extended.resize(6 * face_size, D::default());
         // -x
         for y in 0..=subs {
             for z in 0..=subs {
@@ -134,7 +134,7 @@ where
         let subs = self.block_subdivisions;
         let size_per_face = (2 * subs + 1) * (2 * subs + 1);
         self.transition_cache
-            .resize(num_transitions * size_per_face, D::zero());
+            .resize(num_transitions * size_per_face, D::default());
         for side in transition_sides {
             for cell_u in 0..subs {
                 for cell_v in 0..subs {

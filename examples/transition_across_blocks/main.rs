@@ -21,7 +21,7 @@ mod utils;
 fn blocks_to_show(
     base_subdivisions: usize,
     with_transitions: bool,
-) -> [(Block, flagset::FlagSet<TransitionSide>); 3] {
+) -> [(Block<f32>, flagset::FlagSet<TransitionSide>); 3] {
     [
         (
             Block {
@@ -206,7 +206,7 @@ fn add_grid(
     meshes: &mut ResMut<Assets<Mesh>>,
     mats_cache: &Res<MaterialsResource>,
     model_params: &ModelParams,
-    block: &Block,
+    block: &Block<f32>,
     transition_sides: &TransitionSides,
 ) {
     let grid_mesh = utils::grid_lines(&block, &transition_sides);

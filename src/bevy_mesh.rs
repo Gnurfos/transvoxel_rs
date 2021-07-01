@@ -2,8 +2,10 @@
 This module contains conversion functions toward [Bevy](https://bevyengine.org/) meshes 
 */
 use bevy::render::mesh::Mesh as BevyMesh;
-use crate::structs::Mesh as OurMesh;
+use crate::structs::Mesh as OurGenericMesh;
 use bevy::render::pipeline::PrimitiveTopology::{LineList, TriangleList};
+
+type OurMesh = OurGenericMesh<f32>;
 
 /**
 Convert to a Bevy mesh, producing a triangle list mesh with positions and normals

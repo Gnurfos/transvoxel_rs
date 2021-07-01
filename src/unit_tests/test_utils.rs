@@ -60,8 +60,8 @@ impl Display for TriMatcher {
     }
 }
 
-impl hamcrest::core::Matcher<Triangle> for TriMatcher {
-    fn matches(&self, actual: Triangle) -> hamcrest::core::MatchResult {
+impl hamcrest::core::Matcher<Triangle<f32>> for TriMatcher {
+    fn matches(&self, actual: Triangle<f32>) -> hamcrest::core::MatchResult {
         let tris_match = if self.match_normals {
             same_pos_and_normal
         } else {
@@ -92,19 +92,19 @@ impl hamcrest::core::Matcher<Triangle> for TriMatcher {
     }
 }
 
-fn rotate(t: Triangle) -> Triangle {
+fn rotate(t: Triangle<f32>) -> Triangle<f32> {
     Triangle {
         vertices: [t.vertices[1], t.vertices[2], t.vertices[0]],
     }
 }
 
-fn same_pos(t1: Triangle, t2: Triangle) -> bool {
+fn same_pos(t1: Triangle<f32>, t2: Triangle<f32>) -> bool {
     return (t1.vertices[0].position == t2.vertices[0].position)
         && (t1.vertices[1].position == t2.vertices[1].position)
         && (t1.vertices[2].position == t2.vertices[2].position);
 }
 
-fn same_pos_and_normal(t1: Triangle, t2: Triangle) -> bool {
+fn same_pos_and_normal(t1: Triangle<f32>, t2: Triangle<f32>) -> bool {
     return (t1.vertices[0] == t2.vertices[0])
         && (t1.vertices[1] == t2.vertices[1])
         && (t1.vertices[2] == t2.vertices[2]);
@@ -205,7 +205,7 @@ pub fn make_tri(
     x3: f32,
     y3: f32,
     z3: f32,
-) -> Triangle {
+) -> Triangle<f32> {
     Triangle {
         vertices: [
             Vertex {
@@ -243,7 +243,7 @@ pub fn make_tri_with_normals(
     nx3: f32,
     ny3: f32,
     nz3: f32,
-) -> Triangle {
+) -> Triangle<f32> {
     Triangle {
         vertices: [
             Vertex {
@@ -278,8 +278,8 @@ impl Display for TrianglesMatcher {
 }
 
 use hamcrest::core::*;
-impl Matcher<Vec<Triangle>> for TrianglesMatcher {
-    fn matches(&self, actual: Vec<Triangle>) -> MatchResult {
+impl Matcher<Vec<Triangle<f32>>> for TrianglesMatcher {
+    fn matches(&self, actual: Vec<Triangle<f32>>) -> MatchResult {
         let mut rem = actual.clone();
 
         for item in self.items.iter() {
@@ -322,13 +322,13 @@ macro_rules! tris {
 }
 
 pub fn restrict(
-    tris: Vec<Triangle>,
+    tris: Vec<Triangle<f32>>,
     min_x: f32,
     min_y: f32,
     min_z: f32,
     size: f32,
-) -> Vec<Triangle> {
-    let in_cube = |v: &Vertex| -> bool {
+) -> Vec<Triangle<f32>> {
+    let in_cube = |v: &Vertex<f32>| -> bool {
         (v.position[0] >= min_x)
             && (v.position[0] <= min_x + size)
             && (v.position[1] >= min_y)
@@ -336,7 +336,7 @@ pub fn restrict(
             && (v.position[2] >= min_z)
             && (v.position[2] <= min_z + size)
     };
-    let fully_in_cube = |tri: &Triangle| {
+    let fully_in_cube = |tri: &Triangle<f32>| {
         in_cube(&tri.vertices[0]) && in_cube(&tri.vertices[1]) && in_cube(&tri.vertices[2])
     };
     return tris.into_iter().filter(fully_in_cube).collect();
@@ -439,7 +439,7 @@ impl<D: Default + Density + Copy> VoxelSource<D> for DensityArray<D> {
         );
         // This is for computing a gradient
         // Then return whatever because we don't care about normals in this implementation
-        return D::zero();
+        return D::default();
     }
 }
 
@@ -454,9 +454,9 @@ impl<D: Default + Density> DensityArray<D> {
 
 pub fn extract_from_grid<D: Density + Default + Copy>(
     field: &mut DensityArray<D>,
-    block: &Block,
+    block: &Block<D::F>,
     threshold: D,
     transition_sides: TransitionSides,
-) -> Mesh {
+) -> Mesh<D::F> {
     extract(field, block, threshold, transition_sides)
 }

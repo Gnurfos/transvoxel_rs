@@ -1,6 +1,8 @@
 /*!
 Mapping system between XYZ and UVW coordinates
 */
+use crate::density::Coordinate;
+
 use super::super::structs::*;
 use super::super::transition_sides::*;
 use super::super::voxel_coordinates::*;
@@ -50,11 +52,16 @@ impl Rotation {
         &aux_tables::ROTATIONS[side as usize]
     }
 
-    pub fn to_position_in_block(
+    /**
+    Gives the position of this voxel relative to the block (each coordinate ranging from 0 to 1)
+    */
+    pub fn to_position_in_block<F>(
         &self,
         block_size: usize,
         voxel_index: &HighResolutionVoxelIndex,
-    ) -> Position {
+    ) -> Position<F>
+    where F: Coordinate
+    {
         let cell_index = voxel_index.cell;
         let delta = voxel_index.delta;
         // We multiply by 2 most things to divide in the end, in an attempt to reduce floating point operations (maybe need to measure if this is gaining us anything)
@@ -62,17 +69,17 @@ impl Rotation {
             + self.u.x * (2 * cell_index.cell_u as isize + delta.u)
             + self.v.x * (2 * cell_index.cell_v as isize + delta.v)
             + self.w.x * delta.w;
-        let x = x as f32 * 0.5f32;
+        let x = F::half(x) * F::from_ratio(1, block_size);
         let y = self.uvw_base.y * 2 * block_size as isize
             + self.u.y * (2 * cell_index.cell_u as isize + delta.u)
             + self.v.y * (2 * cell_index.cell_v as isize + delta.v)
             + self.w.y * delta.w;
-        let y = y as f32 * 0.5f32;
+        let y = F::half(y) * F::from_ratio(1, block_size);
         let z = self.uvw_base.z * 2 * block_size as isize
             + self.u.z * (2 * cell_index.cell_u as isize + delta.u)
             + self.v.z * (2 * cell_index.cell_v as isize + delta.v)
             + self.w.z * delta.w;
-        let z = z as f32 * 0.5f32;
+        let z = F::half(z) * F::from_ratio(1, block_size);
         Position { x: x, y: y, z: z }
     }
 

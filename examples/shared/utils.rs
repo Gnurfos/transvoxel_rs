@@ -11,7 +11,7 @@ use transvoxel::{
     voxel_source::WorldMappingVoxelSource,
 };
 
-fn to_bevy(mesh: OurMesh, wireframe: bool) -> BevyMesh {
+fn to_bevy(mesh: OurMesh<f32>, wireframe: bool) -> BevyMesh {
     if wireframe {
         bevy_mesh::to_bevy_wireframe(mesh)
     } else {
@@ -22,7 +22,7 @@ fn to_bevy(mesh: OurMesh, wireframe: bool) -> BevyMesh {
 pub fn mesh_for_model(
     model: &models::Model,
     wireframe: bool,
-    block: &Block,
+    block: &Block<f32>,
     transition_sides: &TransitionSides,
 ) -> BevyMesh {
     let mut models_map = models::models_map();
@@ -32,7 +32,7 @@ pub fn mesh_for_model(
 
 pub fn inside_grid_points(
     model: &models::Model,
-    block: &Block,
+    block: &Block<f32>,
     transition_sides: &TransitionSides,
 ) -> Vec<(f32, f32, f32)> {
     let mut models_map = models::models_map();
@@ -41,9 +41,9 @@ pub fn inside_grid_points(
 }
 
 fn field_model(
-    field: &mut dyn ScalarField<f32>,
+    field: &mut dyn ScalarField<f32, f32>,
     wireframe: bool,
-    block: &Block,
+    block: &Block<f32>,
     transition_sides: &TransitionSides,
 ) -> BevyMesh {
     let mut source = WorldMappingVoxelSource {
@@ -55,12 +55,11 @@ fn field_model(
 }
 
 fn inside_grid_points_for_field(
-    field: &mut dyn ScalarField<f32>,
-    block: &Block,
+    field: &mut dyn ScalarField<f32, f32>,
+    block: &Block<f32>,
     transition_sides: &TransitionSides,
 ) -> Vec<(f32, f32, f32)> {
     let mut result = Vec::<(f32, f32, f32)>::new();
-    let cell_size = block.dims.size / block.subdivisions as f32;
     // Regular points (some shrunk)
     for i in 0..=block.subdivisions {
         for j in 0..=block.subdivisions {
@@ -82,7 +81,7 @@ fn inside_grid_points_for_field(
                 let voxel_index = &TransitionCellIndex::from(side, 0, 0)
                     + &HighResolutionVoxelDelta::from(u as isize, v as isize, 0);
                 let position_in_block = voxel_index.to_position_in_block(block);
-                let pos = &(&position_in_block * cell_size) + &block.dims.base;
+                let pos = &(&position_in_block * block.dims.size) + &block.dims.base;
                 let d = field.get_density(pos.x, pos.y, pos.z);
                 let inside = d >= models::THRESHOLD;
                 if inside {
@@ -94,7 +93,7 @@ fn inside_grid_points_for_field(
     return result;
 }
 
-pub fn grid_lines(block: &Block, transition_sides: &TransitionSides) -> BevyMesh {
+pub fn grid_lines(block: &Block<f32>, transition_sides: &TransitionSides) -> BevyMesh {
     let subs = block.subdivisions;
     let mut bevy_mesh = BevyMesh::new(bevy::render::pipeline::PrimitiveTopology::LineList);
     let mut positions = Vec::<[f32; 3]>::new();
@@ -210,23 +209,22 @@ pub fn grid_lines(block: &Block, transition_sides: &TransitionSides) -> BevyMesh
 }
 
 fn high_res_face_grid_point_position(
-    block: &Block,
+    block: &Block<f32>,
     side: TransitionSide,
     cell_u: usize,
     cell_v: usize,
     delta_u: usize,
     delta_v: usize,
 ) -> [f32; 3] {
-    let cell_size = block.dims.size / block.subdivisions as f32;
     let voxel_index = &TransitionCellIndex::from(side, cell_u, cell_v)
         + &HighResolutionVoxelDelta::from(delta_u as isize, delta_v as isize, 0);
     let position_in_block = voxel_index.to_position_in_block(block);
-    let pos = &(&position_in_block * cell_size) + &block.dims.base;
+    let pos = &(&position_in_block * block.dims.size) + &block.dims.base;
     [pos.x, pos.y, pos.z]
 }
 
 fn regular_position(
-    block: &Block,
+    block: &Block<f32>,
     cell_x: usize,
     cell_y: usize,
     cell_z: usize,
@@ -236,7 +234,7 @@ fn regular_position(
     let mut x = block.dims.base[0] + cell_x as f32 * cell_size;
     let mut y = block.dims.base[1] + cell_y as f32 * cell_size;
     let mut z = block.dims.base[2] + cell_z as f32 * cell_size;
-    shrink_if_needed(
+    shrink_if_needed::<f32>(
         &mut x,
         &mut y,
         &mut z,

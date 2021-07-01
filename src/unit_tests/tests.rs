@@ -304,7 +304,7 @@ fn simple_sphere() {
     // Centered on 10,10,10
     // Radius = 5, that is with threshold 0, density is 0 at 5 and 15, positive between them, negative outside
     struct Sphere;
-    impl ScalarField<f32> for Sphere {
+    impl ScalarField<f32, f32> for Sphere {
         fn get_density(&self, x: f32, y: f32, z: f32) -> f32 {
             let distance_from_center =
                 ((x - 10f32) * (x - 10f32) + (y - 10f32) * (y - 10f32) + (z - 10f32) * (z - 10f32))
@@ -345,11 +345,11 @@ fn simple_sphere() {
 
 struct CountingField<'b, S> {
     pub calls: RefCell<usize>,
-    underlying: WorldMappingVoxelSource<'b, S>,
+    underlying: WorldMappingVoxelSource<'b, S, f32>,
 }
 impl<'b, C> CountingField<'b, ScalarFieldForFn<C>> {
-    pub fn new(closure: C, block: &'b Block) -> Self {
-        let underlying = WorldMappingVoxelSource::<'b, ScalarFieldForFn<C>> {
+    pub fn new(closure: C, block: &'b Block<f32>) -> Self {
+        let underlying = WorldMappingVoxelSource::<'b, ScalarFieldForFn<C>, f32> {
             field: ScalarFieldForFn(closure),
             block: block,
         };
@@ -365,7 +365,7 @@ impl<'b, C> CountingField<'b, ScalarFieldForFn<C>> {
 #[allow(unused_variables)]
 impl<'b, S> VoxelSource<f32> for CountingField<'b, S>
 where
-    S: ScalarField<f32>,
+    S: ScalarField<f32, f32>,
 {
     fn get_density(&self, voxel_index: &RegularVoxelIndex) -> f32 {
         *self.calls.borrow_mut() += 1;

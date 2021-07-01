@@ -1,5 +1,7 @@
 /*!
 Structs for addressing discrete voxels
+ If you subdivide the world or a volume with a grid, "voxels" are the intersection points of the grids
+ The cubes between them are called "cells"
 
 "Regular" means: at the lower voxel resolution, defined by the block's subdivisions.
 That is, without considering transition faces. Even when introducing a transition face
@@ -24,6 +26,8 @@ See [Rotation] for the definitions of UVW for each side of the block.
 
 */
 use std::ops::{Add, Sub};
+
+use crate::density::Coordinate;
 
 use super::implementation::rotation::Rotation;
 use super::structs::{Block, Position};
@@ -175,7 +179,9 @@ impl HighResolutionVoxelIndex {
     }
 
     /// Convert to a relative x, y, z position within the block (0,0,0 being at the block origin, 1,1,1 at the opposite max end)
-    pub fn to_position_in_block(&self, block: &Block) -> Position {
+    pub fn to_position_in_block<F>(&self, block: &Block<F>) -> Position<F>
+    where F: Coordinate,
+    {
         let rotation = Rotation::for_side(self.cell.side);
         let position_in_block = rotation.to_position_in_block(block.subdivisions, self);
         position_in_block

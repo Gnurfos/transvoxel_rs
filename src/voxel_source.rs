@@ -3,7 +3,7 @@ Traits/structs for providing access to a voxel grid
 */
 
 use super::{
-    density::{Density, ScalarField},
+    density::{Density, ScalarField, Coordinate},
     structs::Block,
     voxel_coordinates::{HighResolutionVoxelIndex, RegularVoxelIndex},
 };
@@ -43,38 +43,41 @@ The most interesting logic lies in converting UVW coordinates relative to one tr
 
 The underlying field can be owned, or just a reference, as a reference to a [ScalarField] is also a [ScalarField]
 */
-pub struct WorldMappingVoxelSource<'b, S> {
+pub struct WorldMappingVoxelSource<'b, S, C>
+where C: Coordinate,
+{
     /// [ScalarField] used to access world densities
     pub field: S,
     /// [Block] context, used to mapping coordinates
-    pub block: &'b Block,
+    pub block: &'b Block<C>,
 }
 
-impl<'a, 'b, S, D> VoxelSource<D> for WorldMappingVoxelSource<'b, S>
+impl<'a, 'b, S, D, C> VoxelSource<D> for WorldMappingVoxelSource<'b, S, C>
 where
     D: Density,
-    S: ScalarField<D>,
+    S: ScalarField<D, C>,
+    C: Coordinate,
 {
     fn get_density(&self, voxel_index: &RegularVoxelIndex) -> D {
         let x = self.block.dims.base[0]
-            + self.block.dims.size * voxel_index.x as f32 / self.block.subdivisions as f32;
+            + self.block.dims.size * C::from_ratio(voxel_index.x, self.block.subdivisions);
         let y = self.block.dims.base[1]
-            + self.block.dims.size * voxel_index.y as f32 / self.block.subdivisions as f32;
+            + self.block.dims.size * C::from_ratio(voxel_index.y, self.block.subdivisions);
         let z = self.block.dims.base[2]
-            + self.block.dims.size * voxel_index.z as f32 / self.block.subdivisions as f32;
+            + self.block.dims.size * C::from_ratio(voxel_index.z, self.block.subdivisions);
         let d = self.field.get_density(x, y, z);
         d
     }
 
     fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D {
         let rotation = super::implementation::rotation::Rotation::for_side(index.cell.side);
-        let position_in_block = rotation.to_position_in_block(self.block.subdivisions, index);
+        let position_in_block = rotation.to_position_in_block::<C>(self.block.subdivisions, index);
         let x = self.block.dims.base[0]
-            + self.block.dims.size * position_in_block.x / self.block.subdivisions as f32;
+            + self.block.dims.size * position_in_block.x;
         let y = self.block.dims.base[1]
-            + self.block.dims.size * position_in_block.y / self.block.subdivisions as f32;
+            + self.block.dims.size * position_in_block.y;
         let z = self.block.dims.base[2]
-            + self.block.dims.size * position_in_block.z / self.block.subdivisions as f32;
+            + self.block.dims.size * position_in_block.z;
         self.field.get_density(x, y, z)
     }
 }
