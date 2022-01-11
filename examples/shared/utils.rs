@@ -95,7 +95,7 @@ fn inside_grid_points_for_field(
 
 pub fn grid_lines(block: &Block<f32>, transition_sides: &TransitionSides) -> BevyMesh {
     let subs = block.subdivisions;
-    let mut bevy_mesh = BevyMesh::new(bevy::render::pipeline::PrimitiveTopology::LineList);
+    let mut bevy_mesh = BevyMesh::new(bevy::render::render_resource::PrimitiveTopology::LineList);
     let mut positions = Vec::<[f32; 3]>::new();
     let mut indices = Vec::<u32>::new();
     for i in 0..=subs {

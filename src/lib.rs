@@ -147,7 +147,7 @@ assert!(!sides.contains(TransitionSide::HighX));
 
 */
 #![warn(missing_docs)]
-#![allow(private_intra_doc_links)]
+#![allow(rustdoc::private_intra_doc_links)]
 
 #[cfg(test)]
 mod unit_tests;

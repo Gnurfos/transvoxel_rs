@@ -3,7 +3,7 @@ use bevy::{
     prelude::{shape, Transform},
     render::{
         mesh::{Indices, Mesh as BevyMesh, VertexAttributeValues},
-        pipeline::PrimitiveTopology,
+        render_resource::PrimitiveTopology,
     },
 };
 
@@ -85,7 +85,7 @@ fn merge(mesh1: BevyMesh, mesh2: BevyMesh) -> BevyMesh {
 }
 
 fn append_f3(dest: &mut Vec<[f32; 3]>, src: &VertexAttributeValues, transform: &Transform) -> () {
-    if let VertexAttributeValues::Float3(values) = src {
+    if let VertexAttributeValues::Float32x3(values) = src {
         for value in values.iter() {
             let mut new_val = Vec3::from((value[0], value[1], value[2]));
             new_val = transform.mul_vec3(new_val);
@@ -97,7 +97,7 @@ fn append_f3(dest: &mut Vec<[f32; 3]>, src: &VertexAttributeValues, transform: &
 }
 
 fn append_f2(dest: &mut Vec<[f32; 2]>, src: &VertexAttributeValues) -> () {
-    if let VertexAttributeValues::Float2(values) = src {
+    if let VertexAttributeValues::Float32x2(values) = src {
         for value in values.iter() {
             dest.push(*value);
         }

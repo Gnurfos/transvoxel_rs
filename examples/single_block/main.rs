@@ -4,7 +4,6 @@ use bevy::input::{mouse::MouseButtonInput, system::exit_on_esc_system, ElementSt
 use bevy::prelude::*;
 use bevy::render::mesh::Mesh as BevyMesh;
 use bevy_egui::{egui, EguiContext, EguiPlugin};
-use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 use transvoxel::structs::*;
 use transvoxel::transition_sides::*;
 
@@ -18,6 +17,11 @@ use shapes::create_arrow;
 
 #[path = "../shared/utils.rs"]
 mod utils;
+
+#[path = "../shared/flycam.rs"]
+mod flycam;
+use flycam::{FlyCamera, FlyCameraPlugin};
+
 
 const MAIN_BLOCK: BlockDims<f32> = BlockDims {
     base: [0.0, 0.0, 0.0],
@@ -51,7 +55,7 @@ fn load_materials(
     mats_cache.grid = materials.add(StandardMaterial {
         base_color: Color::BLACK,
         emissive: Color::rgb(0.6, 0.6, 0.6),
-        roughness: 1.0,
+        perceptual_roughness: 1.0,
         metallic: 0.0,
         reflectance: 0.0,
         ..Default::default()
@@ -105,11 +109,11 @@ fn spawn_background(
 }
 
 fn spawn_light(commands: &mut Commands) {
-    commands.spawn_bundle(LightBundle {
+    commands.spawn_bundle(PointLightBundle {
         transform: Transform::from_xyz(10.0, 10.0, 10.0),
-        light: Light {
+        point_light: PointLight {
             range: 100.0,
-            depth: 0.1..250.0,
+            radius: 250.0,
             ..Default::default()
         },
         ..Default::default()
@@ -207,7 +211,8 @@ fn add_grid(
         let cell_size = MAIN_BLOCK.size / model_params.subdivisions as f32;
         let point_size = cell_size * 0.05;
         let resize = Transform::from_scale(Vec3::new(point_size, point_size, point_size));
-        let rotate = Transform::from_rotation(Quat::from_rotation_ypr(
+        let rotate = Transform::from_rotation(Quat::from_euler(
+            EulerRot::YXZ,
             45f32.to_radians(),
             45f32.to_radians(),
             0.0,
@@ -224,12 +229,13 @@ fn add_grid(
     }
 }
 
+#[derive(Component)]
 struct ModelMarkerComponent {}
 
 fn main() {
-    App::build()
+    App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugin(bevy_screen_diags::ScreenDiagsPlugin::default())
+        //.add_plugin(bevy_screen_diags::ScreenDiagsPlugin::default())
         .add_startup_system(setup.system())
         .add_startup_system(add_initial_model.system())
         .add_plugin(FlyCameraPlugin)
@@ -258,13 +264,15 @@ fn ui(
         }
         ui.label("Arrows/PgUp/PgDn to move the camera\nLeft-click/drag to rotate the camera\nEsc to quit");
         let text = format!("Change model (current: {:?})", ui_state.desired_things.model);
-        egui::menu::menu(ui, text, |ui| {
-            for m in models::Model::iterator() {
-                if ui.button(format!("{:?}", m)).clicked() {
-                    model_changed |= ui_state.set_model(*m);
+        let mut selected_model = ui_state.get_model();
+        egui::ComboBox::from_label(text)
+            .selected_text(format!("{:?}", selected_model))
+            .show_ui(ui, |ui| {
+                for m in models::Model::iterator() {
+                    ui.selectable_value(&mut selected_model, *m, format!("{:?}", m));
                 }
-            }
-        });
+            });
+        model_changed |= ui_state.set_model(selected_model);
         if ui.checkbox(&mut ui_state.desired_things.wireframe, "Wireframe").clicked() {
             model_changed = true;
         }
@@ -327,6 +335,9 @@ impl UiState {
         let changed = self.desired_things.model != model;
         self.desired_things.model = model;
         return changed;
+    }
+    pub fn get_model(&self) -> Model {
+        self.desired_things.model
     }
 }
 

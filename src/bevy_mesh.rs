@@ -3,7 +3,7 @@ This module contains conversion functions toward [Bevy](https://bevyengine.org/)
 */
 use bevy::render::mesh::Mesh as BevyMesh;
 use crate::structs::Mesh as OurGenericMesh;
-use bevy::render::pipeline::PrimitiveTopology::{LineList, TriangleList};
+use bevy::render::render_resource::PrimitiveTopology::{LineList, TriangleList};
 
 type OurMesh = OurGenericMesh<f32>;
 
