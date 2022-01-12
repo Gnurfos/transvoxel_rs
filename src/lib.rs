@@ -2,7 +2,7 @@
 
 This is an implementation of Eric Lengyel's Transvoxel Algorithm in Rust
 
-Credits: Eric Lengyel's Transvoxel Algorithm. https://transvoxel.org/
+Credits: Eric Lengyel's Transvoxel Algorithm. <https://transvoxel.org/>
 
 # Brief description of the problem
 When extracting meshes with Marching Cubes for adjacent blocks at different level of detail independently, the meshes generally do not match at the blocks' junctions, inducing visible holes:
