@@ -167,5 +167,5 @@ pub use implementation::algorithm::shrink_if_needed;
 extern crate serde;
 
 #[cfg(feature = "bevy_mesh")]
-#[cfg_attr(docsrs, doc(cfg(feature = "bevy_mesh")))]
+#[cfg_attr(tvxl_docsrs, doc(cfg(feature = "bevy_mesh")))]
 pub mod bevy_mesh;

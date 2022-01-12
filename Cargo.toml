@@ -1,6 +1,6 @@
 [package]
 name = "transvoxel"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Seb E. <seb@nospam.org>"]
 edition = "2018"
 resolver = "2"
@@ -11,7 +11,7 @@ categories = ["algorithms", "game-development", "graphics"]
 keywords = ["gamedev", "voxel", "transvoxel", "marching-cubes", "isosurface"]
 
 [package.metadata.docs.rs]
-rustc-args = ["--cfg", "docsrs"]
+rustc-args = ["--cfg", "tvxl_docsrs"]
 features = ["bevy_mesh"]
 
 [badges]
