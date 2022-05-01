@@ -202,9 +202,9 @@ pub fn grid_lines(block: &Block<f32>, transition_sides: &TransitionSides) -> Bev
     let normals = positions.clone(); // Not really important for lines ?
     let uvs = vec![[0.0, 0.0]; positions.len()];
     bevy_mesh.set_indices(Some(bevy::render::mesh::Indices::U32(indices)));
-    bevy_mesh.set_attribute(BevyMesh::ATTRIBUTE_POSITION, positions);
-    bevy_mesh.set_attribute(BevyMesh::ATTRIBUTE_NORMAL, normals);
-    bevy_mesh.set_attribute(BevyMesh::ATTRIBUTE_UV_0, uvs);
+    bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, positions);
+    bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, normals);
+    bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_UV_0, uvs);
     return bevy_mesh;
 }
 

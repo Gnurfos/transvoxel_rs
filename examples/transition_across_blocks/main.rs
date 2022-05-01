@@ -251,29 +251,29 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         //.add_plugin(bevy_screen_diags::ScreenDiagsPlugin::default())
-        .add_startup_system(setup.system())
-        .add_startup_system(add_initial_model.system())
+        .add_startup_system(setup)
+        .add_startup_system(add_initial_model)
         .add_plugin(FlyCameraPlugin)
-        .add_system(exit_on_esc_system.system())
+        .add_system(exit_on_esc_system)
         .add_plugin(EguiPlugin)
         .init_resource::<UiState>()
         .init_resource::<MaterialsResource>()
-        .add_system(ui.system())
+        .add_system(ui)
         .add_event::<AppEvent>()
-        .add_system(app_events_handler.system())
-        .add_system(clicks_handler.system())
+        .add_system(app_events_handler)
+        .add_system(clicks_handler)
         .run();
 }
 
 fn ui(
     mut _commands: Commands,
-    egui_context: ResMut<EguiContext>,
+    mut egui_context: ResMut<EguiContext>,
     mut ui_state: ResMut<UiState>,
     mut channel: EventWriter<AppEvent>,
 ) {
     let mut model_changed = false;
     let win = egui::Window::new("Controls");
-    win.show(egui_context.ctx(), |ui| {
+    win.show(egui_context.ctx_mut(), |ui| {
         if ui.button("Quit").clicked() {
             channel.send(AppEvent::Quit);
         }

@@ -22,9 +22,9 @@ pub fn to_bevy(mesh: OurMesh) -> BevyMesh {
     let converted_normals = group_by_3(mesh.normals);
 
     bevy_mesh.set_indices(Some(indices));
-    bevy_mesh.set_attribute(BevyMesh::ATTRIBUTE_POSITION, converted_positions);
-    bevy_mesh.set_attribute(BevyMesh::ATTRIBUTE_NORMAL, converted_normals);
-    bevy_mesh.set_attribute(BevyMesh::ATTRIBUTE_UV_0, uvs);
+    bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, converted_positions);
+    bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, converted_normals);
+    bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_UV_0, uvs);
     return bevy_mesh;
 }
 
@@ -47,9 +47,9 @@ pub fn to_bevy_wireframe(mesh: OurMesh) -> BevyMesh {
     let converted_positions = group_by_3(mesh.positions);
     let converted_normals = group_by_3(mesh.normals);
     bevy_mesh.set_indices(Some(indices));
-    bevy_mesh.set_attribute(BevyMesh::ATTRIBUTE_POSITION, converted_positions);
-    bevy_mesh.set_attribute(BevyMesh::ATTRIBUTE_NORMAL, converted_normals);
-    bevy_mesh.set_attribute(BevyMesh::ATTRIBUTE_UV_0, uvs);
+    bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, converted_positions);
+    bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, converted_normals);
+    bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_UV_0, uvs);
     return bevy_mesh;
 }
 

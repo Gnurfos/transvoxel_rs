@@ -77,9 +77,9 @@ fn merge(mesh1: BevyMesh, mesh2: BevyMesh) -> BevyMesh {
     };
 
     let mut mesh = BevyMesh::new(PrimitiveTopology::TriangleList);
-    mesh.set_attribute(BevyMesh::ATTRIBUTE_POSITION, positions);
-    mesh.set_attribute(BevyMesh::ATTRIBUTE_NORMAL, normals);
-    mesh.set_attribute(BevyMesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(BevyMesh::ATTRIBUTE_UV_0, uvs);
     mesh.set_indices(Some(indices));
     mesh
 }
