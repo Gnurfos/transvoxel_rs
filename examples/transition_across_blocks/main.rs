@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 
-use bevy::input::{mouse::MouseButtonInput, system::exit_on_esc_system, ElementState};
+use bevy::input::{mouse::MouseButtonInput, ButtonState};
+use bevy::window::close_on_esc;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiPlugin};
 use transvoxel::structs::{Block, BlockDims};
@@ -145,7 +146,7 @@ fn spawn_light(commands: &mut Commands) {
 fn spawn_camera(commands: &mut Commands) {
     let cam_transform =
         Transform::from_xyz(15.0, 15.0, 15.0).looking_at(Vec3::new(5.0, 5.0, 5.0), Vec3::Y);
-    let mut cam_bundle = commands.spawn_bundle(PerspectiveCameraBundle {
+    let mut cam_bundle = commands.spawn_bundle(Camera3dBundle {
         transform: cam_transform,
         ..Default::default()
     });
@@ -254,7 +255,7 @@ fn main() {
         .add_startup_system(setup)
         .add_startup_system(add_initial_model)
         .add_plugin(FlyCameraPlugin)
-        .add_system(exit_on_esc_system)
+        .add_system(close_on_esc)
         .add_plugin(EguiPlugin)
         .init_resource::<UiState>()
         .init_resource::<MaterialsResource>()
@@ -396,7 +397,7 @@ fn app_events_handler(
 fn clicks_handler(mut events: EventReader<MouseButtonInput>, mut cam_query: Query<&mut FlyCamera>) {
     for event in events.iter() {
         if event.button == MouseButton::Left {
-            if event.state == ElementState::Pressed {
+            if event.state == ButtonState::Pressed {
                 for mut cam in cam_query.iter_mut() {
                     cam.mouse_motion_enabled = true;
                 }
