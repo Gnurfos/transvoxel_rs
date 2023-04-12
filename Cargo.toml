@@ -35,8 +35,9 @@ ndarray = "0.15"
 bevy = { version = "0.8.1", features = ["dynamic"] }
 bevy_egui = "0.16.0"
 #bevy_screen_diags = "0.4.0"
-noise = "0.7.0"
+noise = "0.8.2"
 rand = "0.8.3"
+rand_chacha = "0.3.1"
 
 [profile.dev]
 opt-level = 3
