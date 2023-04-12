@@ -16,7 +16,7 @@ pub fn create_arrow() -> BevyMesh {
 
 fn merge(mesh1: BevyMesh, mesh2: BevyMesh) -> BevyMesh {
     let transform2 = Transform::from_xyz(0.6, 0.0, 0.0);
-    let transform1 = Transform::identity();
+    let transform1 = Transform::IDENTITY;
 
     let mut positions = Vec::<[f32; 3]>::new();
     append_f3(
@@ -88,7 +88,7 @@ fn append_f3(dest: &mut Vec<[f32; 3]>, src: &VertexAttributeValues, transform: &
     if let VertexAttributeValues::Float32x3(values) = src {
         for value in values.iter() {
             let mut new_val = Vec3::from((value[0], value[1], value[2]));
-            new_val = transform.mul_vec3(new_val);
+            new_val = transform.transform_point(new_val);
             dest.push([new_val.x, new_val.y, new_val.z]);
         }
     } else {

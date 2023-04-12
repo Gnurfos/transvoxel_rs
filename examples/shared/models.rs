@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use noise::{Fbm, NoiseFn};
+use noise::{Fbm, NoiseFn, Perlin};
 use std::slice::Iter;
 use transvoxel::density::ScalarField;
 
@@ -88,12 +88,12 @@ impl ScalarField<f32, f32> for Wave {
 }
 
 struct Noise {
-    f: Box<dyn NoiseFn<[f64; 3]>>,
+    f: Box<dyn NoiseFn<f64, 3>>,
 }
 impl Noise {
     pub fn new() -> Self {
         Self {
-            f: Box::new(Fbm::new()),
+            f: Box::new(Fbm::<Perlin>::new(0)),
         }
     }
 }

@@ -3,8 +3,9 @@ use std::f32::consts::PI;
 use bevy::input::{mouse::MouseButtonInput, ButtonState};
 use bevy::window::close_on_esc;
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use bevy::render::mesh::Mesh as BevyMesh;
-use bevy_egui::{egui, EguiContext, EguiPlugin};
+use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use transvoxel::structs::*;
 use transvoxel::transition_sides::*;
 
@@ -34,9 +35,9 @@ fn setup(
     mut meshes: ResMut<Assets<BevyMesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mats_cache: ResMut<MaterialsResource>,
-    mut windows: ResMut<Windows>,
+    mut primary_window_query: Query<&mut Window, With<PrimaryWindow>>,
 ) {
-    windows.get_primary_mut().unwrap().set_title("Transvoxel example".to_string());
+    primary_window_query.single_mut().title = "Transvoxel example".to_string();
     load_materials(&mut materials, mats_cache);
     spawn_background(&mut commands, &mut meshes, &mut materials);
     spawn_light(&mut commands);
@@ -70,8 +71,9 @@ fn spawn_background(
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
     // Ground plane
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: meshes.add(BevyMesh::from(shape::Plane {
+            subdivisions: 4,
             size: MAIN_BLOCK.size,
         })),
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
@@ -85,14 +87,14 @@ fn spawn_background(
     // Axis X
     let arrow = create_arrow();
     let arrow_handle = meshes.add(arrow);
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: arrow_handle.clone(),
         material: materials.add(Color::rgb(0.9, 0.2, 0.2).into()),
         transform: Transform::from_xyz(0.5, 0.0, 0.0),
         ..Default::default()
     });
     // Axis Y
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: arrow_handle.clone(),
         material: materials.add(Color::rgb(0.2, 0.9, 0.2).into()),
         transform: Transform::from_xyz(0.0, 0.5, 0.0)
@@ -100,7 +102,7 @@ fn spawn_background(
         ..Default::default()
     });
     // Axis Z
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: arrow_handle.clone(),
         material: materials.add(Color::rgb(0.2, 0.2, 0.9).into()),
         transform: Transform::from_xyz(0.0, 0.0, 0.5)
@@ -110,7 +112,7 @@ fn spawn_background(
 }
 
 fn spawn_light(commands: &mut Commands) {
-    commands.spawn_bundle(PointLightBundle {
+    commands.spawn(PointLightBundle {
         transform: Transform::from_xyz(10.0, 10.0, 10.0),
         point_light: PointLight {
             range: 100.0,
@@ -124,7 +126,7 @@ fn spawn_light(commands: &mut Commands) {
 fn spawn_camera(commands: &mut Commands) {
     let cam_transform =
         Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::new(5.0, 5.0, 5.0), Vec3::Y);
-    let mut cam_bundle = commands.spawn_bundle(Camera3dBundle {
+    let mut cam_bundle = commands.spawn(Camera3dBundle {
         transform: cam_transform,
         ..Default::default()
     });
@@ -169,7 +171,7 @@ fn load_model(
         mats_cache.solid_model.clone()
     };
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             mesh: meshes.add(bevy_mesh),
             material: mat,
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
@@ -200,7 +202,7 @@ fn add_grid(
     };
     let grid_mesh = utils::grid_lines(&block, &transition_sides);
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             mesh: meshes.add(grid_mesh),
             material: mats_cache.grid.clone(),
             ..Default::default()
@@ -220,7 +222,7 @@ fn add_grid(
         ));
         let translate = Transform::from_xyz(x, y, z);
         commands
-            .spawn_bundle(PbrBundle {
+            .spawn(PbrBundle {
                 mesh: cube_handle.clone(),
                 material: mats_cache.grid_dot.clone(),
                 transform: translate * rotate * resize,
@@ -253,7 +255,7 @@ fn main() {
 
 fn ui(
     mut _commands: Commands,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state: ResMut<UiState>,
     mut channel: EventWriter<AppEvent>,
 ) {
@@ -306,7 +308,7 @@ fn ui(
     });
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 struct UiState {
     pub desired_things: ModelParams,
 }
@@ -342,7 +344,7 @@ impl UiState {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 struct MaterialsResource {
     pub solid_model: Handle<StandardMaterial>,
     pub wireframe_model: Handle<StandardMaterial>,
