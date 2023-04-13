@@ -194,12 +194,12 @@ where
     }
 }
 
-impl<D, S> VoxelSource<D> for PreCachingVoxelSource<D, S>
+impl<D, S> PreCachingVoxelSource<D, S>
 where
     D: Density,
     S: VoxelSource<D>,
 {
-    fn get_density(&self, voxel_index: &RegularVoxelIndex) -> D {
+    pub fn get_density(&mut self, voxel_index: &RegularVoxelIndex) -> D {
         let x = voxel_index.x;
         let y = voxel_index.y;
         let z = voxel_index.z;
@@ -208,26 +208,32 @@ where
         if x == -1 {
             debug_assert!(y >= 0 && y <= subs as isize && z >= 0 && z <= subs as isize);
             let index = 0 * face_size + (subs + 1) * y as usize + z as usize;
+            self.load_regular_extended_voxels();
             return self.regular_cache_extended[index];
         } else if x == subs as isize + 1 {
             debug_assert!(y >= 0 && y <= subs as isize && z >= 0 && z <= subs as isize);
             let index = 1 * face_size + (subs + 1) * y as usize + z as usize;
+            self.load_regular_extended_voxels();
             return self.regular_cache_extended[index];
         } else if y == -1 {
             debug_assert!(x >= 0 && x <= subs as isize && z >= 0 && z <= subs as isize);
             let index = 2 * face_size + (subs + 1) * x as usize + z as usize;
+            self.load_regular_extended_voxels();
             return self.regular_cache_extended[index];
         } else if y == subs as isize + 1 {
             debug_assert!(x >= 0 && x <= subs as isize && z >= 0 && z <= subs as isize);
             let index = 3 * face_size + (subs + 1) * x as usize + z as usize;
+            self.load_regular_extended_voxels();
             return self.regular_cache_extended[index];
         } else if z == -1 {
             debug_assert!(x >= 0 && x <= subs as isize && y >= 0 && y <= subs as isize);
             let index = 4 * face_size + (subs + 1) * x as usize + y as usize;
+            self.load_regular_extended_voxels();
             return self.regular_cache_extended[index];
         } else if z == subs as isize + 1 {
             debug_assert!(x >= 0 && x <= subs as isize && y >= 0 && y <= subs as isize);
             let index = 5 * face_size + (subs + 1) * x as usize + y as usize;
+            self.load_regular_extended_voxels();
             return self.regular_cache_extended[index];
         } else {
             debug_assert!(
@@ -243,7 +249,7 @@ where
         }
     }
 
-    fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D {
+    pub fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D {
         let c = index.cell;
         let d = index.delta;
         let subs = self.block_subdivisions as isize;

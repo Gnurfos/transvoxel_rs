@@ -1,5 +1,5 @@
 # Crate transvoxel
-Current version: 0.5.0
+Current version: 0.5.1
 
 ![Maintenance](https://img.shields.io/badge/maintenance-experimental-blue.svg)
 
