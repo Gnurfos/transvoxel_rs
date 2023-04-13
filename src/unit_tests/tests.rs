@@ -453,3 +453,36 @@ fn random_sides(rng: &mut StdRng) -> TransitionSides {
     }
     sides
 }
+
+#[test]
+fn test_regular_cache_extended_loaded() {
+    // A 3x3x3 block with low X as transition side (x == 0.0)
+    // The only non-zero density is at (0.0, 1.5, 1.0), which means:
+    //  -> the regular cell at 0, 1, 1 will produce nothing
+    //  -> the corresponding transition cell (lowX, u=1, v=1) will produce something (case #2, 2 triangles)
+    //  -> one of the produced vertices will need to evaluate the density gradient at (0.0, 1.0, 1.0), and
+    //  for this access the density at (-1, 1, 1), which is on a the regular voxels grid. In earlier versions
+    // of the aglorithm, this failed because the extended regular grid data was only loaded/accessible if a
+    // regular cell needed it
+    let subdivisions = 3;
+    let size = 3.0;
+    let block = Block::from([0.0, 0.0, 0.0], size, subdivisions);
+    let sides = TransitionSide::LowX.into();
+    let source = |x: f32, y: f32, z: f32| {
+        if (x - 0.0).abs() > f32::EPSILON {
+            0f32
+        } else if (y - 1.5).abs() > f32::EPSILON {
+            0f32
+        } else if (z - 1.0).abs() > f32::EPSILON {
+            0f32
+        } else {
+            1f32
+        }
+    };
+    let m = extract_from_fnmut(source, &block, 0.5, sides);
+    println!(
+        "Extracted mesh with {} tris for sides {:?}",
+        m.num_tris(),
+        sides
+    );
+}
