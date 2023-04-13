@@ -69,7 +69,8 @@ where
         }
         let subs = self.block_subdivisions;
         let face_size = (subs + 1) * (subs + 1);
-        self.regular_cache_extended.resize(6 * face_size, D::default());
+        self.regular_cache_extended
+            .resize(6 * face_size, D::default());
         // -x
         for y in 0..=subs {
             for z in 0..=subs {
@@ -205,42 +206,44 @@ where
         let z = voxel_index.z;
         let subs = self.block_subdivisions;
         let face_size = (subs + 1) * (subs + 1);
-        if x == -1 {
-            debug_assert!(y >= 0 && y <= subs as isize && z >= 0 && z <= subs as isize);
-            let index = 0 * face_size + (subs + 1) * y as usize + z as usize;
-            return self.regular_cache_extended[index];
-        } else if x == subs as isize + 1 {
-            debug_assert!(y >= 0 && y <= subs as isize && z >= 0 && z <= subs as isize);
-            let index = 1 * face_size + (subs + 1) * y as usize + z as usize;
-            return self.regular_cache_extended[index];
-        } else if y == -1 {
-            debug_assert!(x >= 0 && x <= subs as isize && z >= 0 && z <= subs as isize);
-            let index = 2 * face_size + (subs + 1) * x as usize + z as usize;
-            return self.regular_cache_extended[index];
-        } else if y == subs as isize + 1 {
-            debug_assert!(x >= 0 && x <= subs as isize && z >= 0 && z <= subs as isize);
-            let index = 3 * face_size + (subs + 1) * x as usize + z as usize;
-            return self.regular_cache_extended[index];
-        } else if z == -1 {
-            debug_assert!(x >= 0 && x <= subs as isize && y >= 0 && y <= subs as isize);
-            let index = 4 * face_size + (subs + 1) * x as usize + y as usize;
-            return self.regular_cache_extended[index];
-        } else if z == subs as isize + 1 {
-            debug_assert!(x >= 0 && x <= subs as isize && y >= 0 && y <= subs as isize);
-            let index = 5 * face_size + (subs + 1) * x as usize + y as usize;
-            return self.regular_cache_extended[index];
-        } else {
-            debug_assert!(
-                x >= 0
-                    && x <= subs as isize
-                    && y >= 0
-                    && y <= subs as isize
-                    && z >= 0
-                    && z <= subs as isize
-            );
-            let index = self.regular_block_index(x, y, z);
-            return self.regular_cache[index];
+
+        if 0 < self.regular_cache_extended.len() {
+            if x == -1 {
+                debug_assert!(y >= 0 && y <= subs as isize && z >= 0 && z <= subs as isize);
+                let index = 0 * face_size + (subs + 1) * y as usize + z as usize;
+                return self.regular_cache_extended[index];
+            } else if x == subs as isize + 1 {
+                debug_assert!(y >= 0 && y <= subs as isize && z >= 0 && z <= subs as isize);
+                let index = 1 * face_size + (subs + 1) * y as usize + z as usize;
+                return self.regular_cache_extended[index];
+            } else if y == -1 {
+                debug_assert!(x >= 0 && x <= subs as isize && z >= 0 && z <= subs as isize);
+                let index = 2 * face_size + (subs + 1) * x as usize + z as usize;
+                return self.regular_cache_extended[index];
+            } else if y == subs as isize + 1 {
+                debug_assert!(x >= 0 && x <= subs as isize && z >= 0 && z <= subs as isize);
+                let index = 3 * face_size + (subs + 1) * x as usize + z as usize;
+                return self.regular_cache_extended[index];
+            } else if z == -1 {
+                debug_assert!(x >= 0 && x <= subs as isize && y >= 0 && y <= subs as isize);
+                let index = 4 * face_size + (subs + 1) * x as usize + y as usize;
+                return self.regular_cache_extended[index];
+            } else if z == subs as isize + 1 {
+                debug_assert!(x >= 0 && x <= subs as isize && y >= 0 && y <= subs as isize);
+                let index = 5 * face_size + (subs + 1) * x as usize + y as usize;
+                return self.regular_cache_extended[index];
+            }
         }
+        debug_assert!(
+            x >= 0
+                && x <= subs as isize
+                && y >= 0
+                && y <= subs as isize
+                && z >= 0
+                && z <= subs as isize
+        );
+        let index = self.regular_block_index(x, y, z);
+        return self.regular_cache[index];
     }
 
     fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D {

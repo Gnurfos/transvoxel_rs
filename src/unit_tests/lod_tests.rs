@@ -20,7 +20,7 @@ impl NoiseContainer {
         let mut buffer = vec![vec![vec![0.; dimensions]; dimensions]; dimensions];
         let normalizer = dimensions as f64;
         /* Because the seed for noises are not working, an offset is used to simulate actual randomness */
-        use rand::{Rng, SeedableRng}; 
+        use rand::{Rng, SeedableRng};
         use std::time::{SystemTime, UNIX_EPOCH};
         let seed = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -67,14 +67,30 @@ impl ScalarField<f32, f32> for &NoiseContainer {
     }
 }
 
-use crate::structs::Block;
 use crate::extraction::extract_from_field;
+use crate::structs::Block;
 use crate::transition_sides::no_side;
+use crate::transition_sides::TransitionSide::*;
 #[test] /* - For checking if extracting the surface for different resolutions won't crash the app */
 fn extract_field_in_multiple_resolution() {
-	let noise = NoiseContainer::block(64);
-	for resolution in 4..noise.size() {
-		let block = Block::from([0.,0.,0.], noise.size() as f32, resolution);
-		let _mesh = extract_from_field(&noise, &block, 0.0, no_side());
-	}
+    let noise = NoiseContainer::block(64);
+    let max_pos = [noise.size(), noise.size(), noise.size()];
+    let step_by = noise.size() / 8;
+
+    for resolution in 4..noise.size() {
+        for x in (0..max_pos[0] as i32).step_by(step_by) {
+            for y in (0..max_pos[1] as i32).step_by(step_by) {
+                for z in (0..max_pos[2] as i32).step_by(step_by) {
+                    let block =
+                        Block::from([x as f32, y as f32, z as f32], step_by as f32, resolution);
+                    let _mesh = extract_from_field(
+                        &noise,
+                        &block,
+                        0.0,
+                        no_side() | LowX | HighX | LowY | HighY | LowZ | HighZ,
+                    );
+                }
+            }
+        }
+    }
 }
