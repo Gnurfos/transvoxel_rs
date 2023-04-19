@@ -1,6 +1,6 @@
 [package]
 name = "transvoxel"
-version = "0.5.1"
+version = "0.6.0"
 authors = ["Seb E. <seb@nospam.org>"]
 edition = "2018"
 resolver = "2"

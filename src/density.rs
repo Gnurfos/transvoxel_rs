@@ -35,7 +35,7 @@ pub trait Density: Default + Clone + Copy {
     /**
     TODO comment
     */
-    fn inside(&self) -> bool;
+    fn inside(&self, threshold: &Self) -> bool;
 
 
     /**
@@ -83,8 +83,8 @@ impl Density for f32 {
     
     type F = f32;
 
-    fn inside(&self) -> bool {
-        self > &0f32
+    fn inside(&self, threshold: &Self) -> bool {
+        self > threshold
     }
 
     fn to_normal(a: &Self, b: &Self, c: &Self) -> [f32; 3] {

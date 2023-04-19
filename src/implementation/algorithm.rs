@@ -207,7 +207,7 @@ where
         let mut case: usize = 0;
         for (i, deltas) in REGULAR_CELL_VOXELS.iter().enumerate() {
             let voxel_index = cell_index + deltas;
-            let inside = self.regular_voxel_density(&voxel_index).inside();
+            let inside = self.regular_voxel_density(&voxel_index).inside(&self.threshold);
             if inside {
                 case += 1 << i;
             }
@@ -220,7 +220,7 @@ where
         for (voxel_delta, contribution) in TRANSITION_HIGH_RES_FACE_CASE_CONTRIBUTIONS.iter() {
             let voxel_index = cell_index + voxel_delta;
             let density = self.transition_grid_point_density(&voxel_index);
-            let inside = density.inside();
+            let inside = density.inside(&self.threshold);
             if inside {
                 case += contribution;
             }
