@@ -1,16 +1,19 @@
 use std::f32::consts::PI;
 
 use bevy::input::{mouse::MouseButtonInput, ButtonState};
-use bevy::window::close_on_esc;
 use bevy::prelude::*;
+use bevy::window::close_on_esc;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use transvoxel::structs::{Block, BlockDims};
 use transvoxel::transition_sides::*;
+use transvoxel::voxel_source::{Block, BlockDims};
 
 #[path = "../shared/models.rs"]
 mod models;
 use models::Model;
+
+#[path = "../shared/bevy_mesh.rs"]
+mod bevy_mesh;
 
 #[path = "../shared/shapes.rs"]
 mod shapes;
@@ -179,7 +182,8 @@ fn load_model(
     for (block, transition_sides) in
         &blocks_to_show(model_params.subdivisions, model_params.with_transitions)
     {
-        let bevy_mesh = utils::mesh_for_model(&model_params.model, wireframe, &block, &transition_sides);
+        let bevy_mesh =
+            utils::mesh_for_model(&model_params.model, wireframe, &block, &transition_sides);
         let mat = if wireframe {
             mats_cache.wireframe_model.clone()
         } else {

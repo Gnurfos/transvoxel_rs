@@ -1,15 +1,15 @@
 /*!
 Mapping system between XYZ and UVW coordinates
 */
-use crate::density::Coordinate;
+use crate::mesh_builder::Position;
+use crate::traits::Coordinate;
 
-use super::super::structs::*;
 use super::super::transition_sides::*;
 use super::super::voxel_coordinates::*;
 use super::aux_tables;
 
 #[derive(Debug)]
-pub struct XYZ {
+pub struct Xyz {
     pub x: isize,
     pub y: isize,
     pub z: isize,
@@ -22,13 +22,13 @@ pub struct Rotation {
     /// The side is just stored along here for convenience
     pub side: TransitionSide,
     /// Where the origin of the UVW system is, in the XYZ system. It is used both for cells and blocks. 0 is at the lowest of the cell or block, 1 at the highest
-    pub uvw_base: XYZ,
+    pub uvw_base: Xyz,
     /// The direction of the U unit vector, in the XYZ system. Components can be -1 0 or 1
-    pub u: XYZ,
+    pub u: Xyz,
     /// The direction of the V unit vector, in the XYZ system. Components can be -1 0 or 1
-    pub v: XYZ,
+    pub v: Xyz,
     /// The direction of the W unit vector, in the XYZ system. Components can be -1 0 or 1
-    pub w: XYZ,
+    pub w: Xyz,
     /// The direction of the X unit vector, in the UVW system. Components can be -1 0 or 1
     pub plus_x_as_uvw: HighResolutionVoxelDelta,
     /// The direction of the Y unit vector, in the UVW system. Components can be -1 0 or 1
@@ -37,9 +37,9 @@ pub struct Rotation {
     pub plus_z_as_uvw: HighResolutionVoxelDelta,
 }
 
-impl XYZ {
+impl Xyz {
     const fn from(xyz: (isize, isize, isize)) -> Self {
-        XYZ {
+        Xyz {
             x: xyz.0,
             y: xyz.1,
             z: xyz.2,
@@ -60,7 +60,8 @@ impl Rotation {
         block_size: usize,
         voxel_index: &HighResolutionVoxelIndex,
     ) -> Position<F>
-    where F: Coordinate
+    where
+        F: Coordinate,
     {
         let cell_index = voxel_index.cell;
         let delta = voxel_index.delta;
@@ -80,7 +81,7 @@ impl Rotation {
             + self.v.z * (2 * cell_index.cell_v as isize + delta.v)
             + self.w.z * delta.w;
         let z = F::half(z) * F::from_ratio(1, block_size);
-        Position { x: x, y: y, z: z }
+        Position { x, y, z }
     }
 
     pub fn to_regular_voxel_index(
@@ -99,9 +100,10 @@ impl Rotation {
         let z = self.uvw_base.z * block_size as isize
             + self.u.z * (cell_index.cell_u + face_u) as isize
             + self.v.z * (cell_index.cell_v + face_v) as isize;
-        return RegularVoxelIndex { x, y, z };
+        RegularVoxelIndex { x, y, z }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub const fn from(
         side: TransitionSide,
         uvw_base: (isize, isize, isize),
@@ -114,11 +116,11 @@ impl Rotation {
         z: (isize, isize, isize),
     ) -> Self {
         Rotation {
-            side: side,
-            uvw_base: XYZ::from(uvw_base),
-            u: XYZ::from(u),
-            v: XYZ::from(v),
-            w: XYZ::from(w),
+            side,
+            uvw_base: Xyz::from(uvw_base),
+            u: Xyz::from(u),
+            v: Xyz::from(v),
+            w: Xyz::from(w),
             plus_x_as_uvw: HighResolutionVoxelDelta::from(x.0, x.1, x.2),
             plus_y_as_uvw: HighResolutionVoxelDelta::from(y.0, y.1, y.2),
             plus_z_as_uvw: HighResolutionVoxelDelta::from(z.0, z.1, z.2),

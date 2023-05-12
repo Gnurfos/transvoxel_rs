@@ -1,9 +1,10 @@
-use crate::structs::*;
-use crate::{density::*, transition_sides::*, voxel_source::VoxelSource};
+use crate::traits::*;
+use crate::voxel_source::Block;
 use crate::{
     extraction::extract,
     voxel_coordinates::{HighResolutionVoxelIndex, RegularVoxelIndex},
 };
+use crate::{generic_mesh::*, transition_sides::*, voxel_source::VoxelSource};
 use ndarray::{Array3, Array6};
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -410,8 +411,8 @@ where
     }
 }
 
-impl<D: Default + Density + Copy> VoxelSource<D> for DensityArray<D> {
-    fn get_density(&self, voxel_index: &RegularVoxelIndex) -> D {
+impl<D: Density> VoxelSource<D> for DensityArray<D> {
+    fn get_regular_voxel(&mut self, voxel_index: &RegularVoxelIndex) -> D {
         self.data[[
             (voxel_index.x + 1) as usize,
             (voxel_index.y + 1) as usize,
@@ -420,7 +421,7 @@ impl<D: Default + Density + Copy> VoxelSource<D> for DensityArray<D> {
     }
 
     #[allow(unused_variables, unused_mut)]
-    fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D {
+    fn get_transition_voxel(&mut self, index: &HighResolutionVoxelIndex) -> D {
         let side = index.cell.side;
         if (index.delta.u % 2 != 0) || (index.delta.v % 2 != 0) {
             return self.get_inter(
@@ -452,11 +453,12 @@ impl<D: Default + Density> DensityArray<D> {
     }
 }
 
-pub fn extract_from_grid<D: Density + Default + Copy>(
-    field: &mut DensityArray<D>,
-    block: &Block<D::F>,
-    threshold: D,
+pub fn extract_from_grid(
+    field: &mut DensityArray<f32>,
+    block: &Block<f32>,
+    threshold: f32,
     transition_sides: TransitionSides,
-) -> Mesh<D::F> {
-    extract(field, block, threshold, transition_sides)
+) -> Mesh<f32> {
+    let builder = GenericMeshBuilder::new();
+    extract(field, block, threshold, transition_sides, builder).build()
 }

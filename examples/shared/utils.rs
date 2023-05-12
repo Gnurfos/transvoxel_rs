@@ -1,23 +1,14 @@
+use crate::bevy_mesh::BevyMeshBuilder;
 use crate::models;
 use bevy::render::mesh::Mesh as BevyMesh;
 use transvoxel::shrink_if_needed;
 use transvoxel::transition_sides::*;
 use transvoxel::{
-    bevy_mesh,
-    density::ScalarField,
     extraction::extract,
-    structs::{Block, Mesh as OurMesh},
     voxel_coordinates::{HighResolutionVoxelDelta, TransitionCellIndex},
     voxel_source::WorldMappingVoxelSource,
+    voxel_source::*,
 };
-
-fn to_bevy(mesh: OurMesh<f32>, wireframe: bool) -> BevyMesh {
-    if wireframe {
-        bevy_mesh::to_bevy_wireframe(mesh)
-    } else {
-        bevy_mesh::to_bevy(mesh)
-    }
-}
 
 pub fn mesh_for_model(
     model: &models::Model,
@@ -41,21 +32,31 @@ pub fn inside_grid_points(
 }
 
 fn field_model(
-    field: &mut dyn ScalarField<f32, f32>,
+    field: &mut dyn DataField<f32, f32>,
     wireframe: bool,
     block: &Block<f32>,
     transition_sides: &TransitionSides,
 ) -> BevyMesh {
-    let mut source = WorldMappingVoxelSource {
+    let source = WorldMappingVoxelSource {
         field: field,
         block: &block,
     };
-    let mesh = extract(&mut source, &block, models::THRESHOLD, *transition_sides);
-    to_bevy(mesh, wireframe)
+    let builder = extract(
+        source,
+        &block,
+        models::THRESHOLD,
+        *transition_sides,
+        BevyMeshBuilder::default(),
+    );
+    if wireframe {
+        builder.build_wireframe()
+    } else {
+        builder.build()
+    }
 }
 
 fn inside_grid_points_for_field(
-    field: &mut dyn ScalarField<f32, f32>,
+    field: &mut dyn DataField<f32, f32>,
     block: &Block<f32>,
     transition_sides: &TransitionSides,
 ) -> Vec<(f32, f32, f32)> {
@@ -66,7 +67,7 @@ fn inside_grid_points_for_field(
             for k in 0..=block.subdivisions {
                 let unshrunk_pos = regular_position(block, i, j, k, &no_side());
                 let final_pos = regular_position(block, i, j, k, transition_sides);
-                let d = field.get_density(unshrunk_pos[0], unshrunk_pos[1], unshrunk_pos[2]);
+                let d = field.get_data(unshrunk_pos[0], unshrunk_pos[1], unshrunk_pos[2]);
                 let inside = d >= models::THRESHOLD;
                 if inside {
                     result.push((final_pos[0], final_pos[1], final_pos[2]));
@@ -82,7 +83,7 @@ fn inside_grid_points_for_field(
                     + &HighResolutionVoxelDelta::from(u as isize, v as isize, 0);
                 let position_in_block = voxel_index.to_position_in_block(block);
                 let pos = &(&position_in_block * block.dims.size) + &block.dims.base;
-                let d = field.get_density(pos.x, pos.y, pos.z);
+                let d = field.get_data(pos.x, pos.y, pos.z);
                 let inside = d >= models::THRESHOLD;
                 if inside {
                     result.push((pos.x, pos.y, pos.z));
@@ -200,11 +201,9 @@ pub fn grid_lines(block: &Block<f32>, transition_sides: &TransitionSides) -> Bev
         }
     }
     let normals = positions.clone(); // Not really important for lines ?
-    let uvs = vec![[0.0, 0.0]; positions.len()];
     bevy_mesh.set_indices(Some(bevy::render::mesh::Indices::U32(indices)));
     bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, positions);
     bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, normals);
-    bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_UV_0, uvs);
     return bevy_mesh;
 }
 

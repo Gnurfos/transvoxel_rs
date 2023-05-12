@@ -1,27 +1,28 @@
 use std::collections::HashMap;
 
+use crate::traits::VoxelData;
+
 use super::super::{
-    density::Density,
     transition_sides::TransitionSides,
     voxel_coordinates::{HighResolutionVoxelIndex, RegularVoxelIndex},
     voxel_source::VoxelSource,
 };
 
-pub struct PreCachingVoxelSource<D, S> {
+pub struct PreCachingVoxelSource<V, S> {
     inner_source: S,
     block_subdivisions: usize,
-    regular_cache: Vec<D>,
-    regular_cache_extended: Vec<D>,
+    regular_cache: Vec<V>,
+    regular_cache_extended: Vec<V>,
     regular_cache_extended_loaded: bool,
-    transition_cache: Vec<D>,
+    transition_cache: Vec<V>,
     transition_cache_loaded: bool,
     transition_cache_slices: HashMap<usize, usize>, // side -> slice in the cache
 }
 
-impl<D, S> PreCachingVoxelSource<D, S>
+impl<V, S> PreCachingVoxelSource<V, S>
 where
-    D: Density,
-    S: VoxelSource<D>,
+    V: VoxelData,
+    S: VoxelSource<V>,
 {
     pub fn new(source: S, block_subdivisions: usize) -> Self {
         let mut object = Self {
@@ -41,13 +42,13 @@ where
     fn load_regular_block_voxels(&mut self) {
         let subs = self.block_subdivisions;
         self.regular_cache
-            .resize((subs + 1) * (subs + 1) * (subs + 1), D::default());
+            .resize((subs + 1) * (subs + 1) * (subs + 1), V::default());
         for x in 0..=subs {
             for y in 0..=subs {
                 for z in 0..=subs {
                     let index = self.regular_block_index(x as isize, y as isize, z as isize);
                     self.regular_cache[index] =
-                        self.from_source(x as isize, y as isize, z as isize);
+                        self.get_from_source(x as isize, y as isize, z as isize);
                 }
             }
         }
@@ -69,50 +70,54 @@ where
         }
         let subs = self.block_subdivisions;
         let face_size = (subs + 1) * (subs + 1);
-        self.regular_cache_extended.resize(6 * face_size, D::default());
+        self.regular_cache_extended
+            .resize(6 * face_size, V::default());
         // -x
         for y in 0..=subs {
             for z in 0..=subs {
-                let index = 0 * face_size + (subs + 1) * y as usize + z as usize;
-                self.regular_cache_extended[index] = self.from_source(-1, y as isize, z as isize);
+                let index = (subs + 1) * y + z;
+                self.regular_cache_extended[index] =
+                    self.get_from_source(-1, y as isize, z as isize);
             }
         }
         // +x
         for y in 0..=subs {
             for z in 0..=subs {
-                let index = 1 * face_size + (subs + 1) * y as usize + z as usize;
+                let index = face_size + (subs + 1) * y + z;
                 self.regular_cache_extended[index] =
-                    self.from_source(subs as isize + 1, y as isize, z as isize);
+                    self.get_from_source(subs as isize + 1, y as isize, z as isize);
             }
         }
         // -y
         for x in 0..=subs {
             for z in 0..=subs {
-                let index = 2 * face_size + (subs + 1) * x as usize + z as usize;
-                self.regular_cache_extended[index] = self.from_source(x as isize, -1, z as isize);
+                let index = 2 * face_size + (subs + 1) * x + z;
+                self.regular_cache_extended[index] =
+                    self.get_from_source(x as isize, -1, z as isize);
             }
         }
         // +y
         for x in 0..=subs {
             for z in 0..=subs {
-                let index = 3 * face_size + (subs + 1) * x as usize + z as usize;
+                let index = 3 * face_size + (subs + 1) * x + z;
                 self.regular_cache_extended[index] =
-                    self.from_source(x as isize, subs as isize + 1, z as isize);
+                    self.get_from_source(x as isize, subs as isize + 1, z as isize);
             }
         }
         // -z
         for x in 0..=subs {
             for y in 0..=subs {
-                let index = 4 * face_size + (subs + 1) * x as usize + y as usize;
-                self.regular_cache_extended[index] = self.from_source(x as isize, y as isize, -1);
+                let index = 4 * face_size + (subs + 1) * x + y;
+                self.regular_cache_extended[index] =
+                    self.get_from_source(x as isize, y as isize, -1);
             }
         }
         // +z
         for x in 0..=subs {
             for y in 0..=subs {
-                let index = 5 * face_size + (subs + 1) * x as usize + y as usize;
+                let index = 5 * face_size + (subs + 1) * x + y;
                 self.regular_cache_extended[index] =
-                    self.from_source(x as isize, y as isize, subs as isize + 1);
+                    self.get_from_source(x as isize, y as isize, subs as isize + 1);
             }
         }
     }
@@ -134,7 +139,7 @@ where
         let subs = self.block_subdivisions;
         let size_per_face = (2 * subs + 1) * (2 * subs + 1);
         self.transition_cache
-            .resize(num_transitions * size_per_face, D::default());
+            .resize(num_transitions * size_per_face, V::default());
         for side in transition_sides {
             for cell_u in 0..subs {
                 for cell_v in 0..subs {
@@ -171,7 +176,7 @@ where
     }
 
     fn cache_transition_voxel(&mut self, voxel_index: &HighResolutionVoxelIndex) {
-        let d = self.inner_source.get_transition_density(voxel_index);
+        let d = self.inner_source.get_transition_voxel(voxel_index);
         let cache_index = self.transition_cache_index(voxel_index);
         self.transition_cache[cache_index] = d;
     }
@@ -188,18 +193,18 @@ where
         slice_shift + index_in_slice
     }
 
-    fn from_source(&mut self, x: isize, y: isize, z: isize) -> D {
+    fn get_from_source(&mut self, x: isize, y: isize, z: isize) -> V {
         self.inner_source
-            .get_density(&RegularVoxelIndex { x, y, z })
+            .get_regular_voxel(&RegularVoxelIndex { x, y, z })
     }
 }
 
-impl<D, S> PreCachingVoxelSource<D, S>
+impl<V, S> PreCachingVoxelSource<V, S>
 where
-    D: Density,
-    S: VoxelSource<D>,
+    V: VoxelData,
+    S: VoxelSource<V>,
 {
-    pub fn get_density(&mut self, voxel_index: &RegularVoxelIndex) -> D {
+    pub fn get_data(&mut self, voxel_index: &RegularVoxelIndex) -> V {
         let x = voxel_index.x;
         let y = voxel_index.y;
         let z = voxel_index.z;
@@ -207,34 +212,34 @@ where
         let face_size = (subs + 1) * (subs + 1);
         if x == -1 {
             debug_assert!(y >= 0 && y <= subs as isize && z >= 0 && z <= subs as isize);
-            let index = 0 * face_size + (subs + 1) * y as usize + z as usize;
+            let index = (subs + 1) * y as usize + z as usize;
             self.load_regular_extended_voxels();
-            return self.regular_cache_extended[index];
+            self.regular_cache_extended[index]
         } else if x == subs as isize + 1 {
             debug_assert!(y >= 0 && y <= subs as isize && z >= 0 && z <= subs as isize);
-            let index = 1 * face_size + (subs + 1) * y as usize + z as usize;
+            let index = face_size + (subs + 1) * y as usize + z as usize;
             self.load_regular_extended_voxels();
-            return self.regular_cache_extended[index];
+            self.regular_cache_extended[index]
         } else if y == -1 {
             debug_assert!(x >= 0 && x <= subs as isize && z >= 0 && z <= subs as isize);
             let index = 2 * face_size + (subs + 1) * x as usize + z as usize;
             self.load_regular_extended_voxels();
-            return self.regular_cache_extended[index];
+            self.regular_cache_extended[index]
         } else if y == subs as isize + 1 {
             debug_assert!(x >= 0 && x <= subs as isize && z >= 0 && z <= subs as isize);
             let index = 3 * face_size + (subs + 1) * x as usize + z as usize;
             self.load_regular_extended_voxels();
-            return self.regular_cache_extended[index];
+            self.regular_cache_extended[index]
         } else if z == -1 {
             debug_assert!(x >= 0 && x <= subs as isize && y >= 0 && y <= subs as isize);
             let index = 4 * face_size + (subs + 1) * x as usize + y as usize;
             self.load_regular_extended_voxels();
-            return self.regular_cache_extended[index];
+            self.regular_cache_extended[index]
         } else if z == subs as isize + 1 {
             debug_assert!(x >= 0 && x <= subs as isize && y >= 0 && y <= subs as isize);
             let index = 5 * face_size + (subs + 1) * x as usize + y as usize;
             self.load_regular_extended_voxels();
-            return self.regular_cache_extended[index];
+            self.regular_cache_extended[index]
         } else {
             debug_assert!(
                 x >= 0
@@ -245,11 +250,11 @@ where
                     && z <= subs as isize
             );
             let index = self.regular_block_index(x, y, z);
-            return self.regular_cache[index];
+            self.regular_cache[index]
         }
     }
 
-    pub fn get_transition_density(&self, index: &HighResolutionVoxelIndex) -> D {
+    pub fn get_transition_data(&mut self, index: &HighResolutionVoxelIndex) -> V {
         let c = index.cell;
         let d = index.delta;
         let subs = self.block_subdivisions as isize;
@@ -265,9 +270,9 @@ where
             || (c.cell_v as isize * 2 + d.v > 2 * subs)
         {
             // Out of the block face: we don't cache these
-            return self.inner_source.get_transition_density(index);
+            return self.inner_source.get_transition_voxel(index);
         }
         let cache_index = self.transition_cache_index(index);
-        return self.transition_cache[cache_index];
+        self.transition_cache[cache_index]
     }
 }

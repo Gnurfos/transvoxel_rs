@@ -1,11 +1,12 @@
-use transvoxel::{density::*, structs::Block, voxel_source::WorldMappingVoxelSource};
+use transvoxel::generic_mesh::*;
+use transvoxel::voxel_source::*;
 
 use transvoxel::extraction::*;
 use transvoxel::transition_sides::TransitionSide;
 
 struct Sphere;
-impl ScalarField<f32, f32> for Sphere {
-    fn get_density(&self, x: f32, y: f32, z: f32) -> f32 {
+impl DataField<f32, f32> for Sphere {
+    fn get_data(&mut self, x: f32, y: f32, z: f32) -> f32 {
         sphere_density(x, y, z)
     }
 }
@@ -22,26 +23,38 @@ fn main() {
     let block = Block::from([0.0, 0.0, 0.0], 10.0, subdivisions);
 
     // Extract from a [VoxelSource]
-    let mut source = WorldMappingVoxelSource {
-        field: &mut Sphere {},
+    let source = WorldMappingVoxelSource {
+        field: Sphere {},
         block: &block,
     };
-    let mesh = extract(&mut source, &block, THRESHOLD, TransitionSide::LowX.into());
+    let mesh = GenericMeshBuilder::new();
+    let mesh = extract(source, &block, THRESHOLD, TransitionSide::LowX.into(), mesh).build();
     println!("Extracted mesh: {:#?}", mesh);
 
     // Extract from a [ScalarField]
-    let mut field = Sphere {};
-    let mesh = extract_from_field(&mut field, &block, THRESHOLD, TransitionSide::LowX.into());
+    let field = Sphere {};
+    let mesh = GenericMeshBuilder::new();
+    let mesh =
+        extract_from_field(field, &block, THRESHOLD, TransitionSide::LowX.into(), mesh).build();
     println!("Extracted mesh: {:#?}", mesh);
 
     // Extract from a simple field function
-    let mut field = ScalarFieldForFn(sphere_density);
-    let mesh = extract_from_field(&mut field, &block, THRESHOLD, TransitionSide::LowX.into());
+    // let mut field = DataFieldForFn(sphere_density);
+    let mesh = GenericMeshBuilder::new();
+    let mesh = extract_from_field(
+        &sphere_density,
+        &block,
+        THRESHOLD,
+        TransitionSide::LowX.into(),
+        mesh,
+    )
+    .build();
     println!("Extracted mesh: {:#?}", mesh);
 
     // Extract from a simple field closure
-    let mut field =
-        ScalarFieldForFn(|x: f32, y: f32, z: f32| 1f32 - (x * x + y * y + z * z).sqrt() / 5f32);
-    let mesh = extract_from_field(&mut field, &block, THRESHOLD, TransitionSide::LowX.into());
+    let field = |x: f32, y: f32, z: f32| 1f32 - (x * x + y * y + z * z).sqrt() / 5f32;
+    let mesh = GenericMeshBuilder::new();
+    let mesh =
+        extract_from_field(&field, &block, THRESHOLD, TransitionSide::LowX.into(), mesh).build();
     println!("Extracted mesh: {:#?}", mesh);
 }

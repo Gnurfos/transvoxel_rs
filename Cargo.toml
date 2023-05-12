@@ -1,6 +1,6 @@
 [package]
 name = "transvoxel"
-version = "0.6.0"
+version = "1.0.0"
 authors = ["Seb E. <seb@nospam.org>"]
 edition = "2018"
 resolver = "2"
@@ -12,14 +12,12 @@ keywords = ["gamedev", "voxel", "transvoxel", "marching-cubes", "isosurface"]
 
 [package.metadata.docs.rs]
 rustc-args = ["--cfg", "tvxl_docsrs"]
-features = ["bevy_mesh"]
 
 [badges]
 maintenance = { status = "experimental" }
 
 [features]
 default = ["serde"]
-bevy_mesh = ["bevy", "bytemuck"]
 
 [dependencies]
 flagset = "0.4"
@@ -43,8 +41,7 @@ opt-level = 3
 
 [[example]]
 name = "single_block"
-required-features = ["bevy_mesh"]
 
 [[example]]
 name = "transition_across_blocks"
-required-features = ["bevy_mesh"]
+

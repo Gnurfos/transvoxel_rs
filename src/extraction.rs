@@ -1,99 +1,92 @@
 /*!
 Main mesh extraction methods
 */
-use std::cell::RefCell;
 
 use super::implementation::algorithm::Extractor;
-use super::structs::*;
-use super::{
-    density::*,
-    voxel_source::{VoxelSource, WorldMappingVoxelSource},
-};
+use super::mesh_builder::*;
+use super::traits::*;
+use super::voxel_source::*;
 use crate::transition_sides::TransitionSides;
 
 /**
-Extracts an iso-surface [Mesh] for a [VoxelSource]
+Extracts an iso-surface mesh for a [VoxelSource]
 
 Arguments:
- * `source`: the density source
+ * `source`: the voxel data source
  * `block`: the world zone for which to extract, and its subdivisions count
  * `threshold`: density value defining the iso-surface
  * `transition_sides`: the set of sides of the block which need to be adapted to neighbour double-resolution blocks (twice the subdivisions)
+ * `mesh_builder`: builder object on which functions will be called to append vertices and triangles
+ * The provided mesh_builder is returned back at the end.
  */
-pub fn extract<D, S>(
+pub fn extract<C, V, S, M>(
     source: S,
-    block: &Block<D::F>,
-    threshold: D,
+    block: &Block<C>,
+    threshold: V::Density,
     transition_sides: TransitionSides,
-) -> Mesh<D::F>
+    mesh_builder: M,
+) -> M
 where
-    D: Density,
-    S: VoxelSource<D>,
+    C: Coordinate,
+    V: VoxelData,
+    S: VoxelSource<V>,
+    M: MeshBuilder<V, C>,
 {
-    Extractor::new(source, block, threshold, transition_sides).extract()
+    Extractor::new(source, block, threshold, transition_sides, mesh_builder).extract()
 }
 
 /**
-Extracts an iso-surface [Mesh] for a [ScalarField]
+Extracts an iso-surface mesh for a [DataField]
 
 Arguments:
- * `field`: the density field
+ * `field`: the voxel data field
  * `block`: the world zone for which to extract, and its subdivisions count
  * `threshold`: density value defining the iso-surface
  * `transition_sides`: the set of sides of the block which need to be adapted to neighbour double-resolution blocks (twice the subdivisions)
-*/
-pub fn extract_from_field<D, FIELD>(
+ * `mesh_builder`: builder object on which functions will be called to append vertices and triangles
+ * The provided mesh_builder is returned back at the end.
+ */
+pub fn extract_from_field<C, V, FIELD, M>(
     field: FIELD,
-    block: &Block<D::F>,
-    threshold: D,
+    block: &Block<C>,
+    threshold: V::Density,
     transition_sides: TransitionSides,
-) -> Mesh<D::F>
+    mesh_builder: M,
+) -> M
 where
-    D: Density,
-    FIELD: ScalarField<D, D::F>, // TODO simplify, only need 1 parameter
+    C: Coordinate,
+    V: VoxelData,
+    FIELD: DataField<V, C>,
+    M: MeshBuilder<V, C>,
 {
-    let mut source = WorldMappingVoxelSource { field, block };
-    Extractor::new(&mut source, block, threshold, transition_sides).extract()
+    let source = WorldMappingVoxelSource { field, block };
+    Extractor::new(source, block, threshold, transition_sides, mesh_builder).extract()
 }
 
 /**
-Extracts an iso-surface [Mesh] for a [ScalarField]-compatible closure
+Extracts an iso-surface mesh for a [DataField]-compatible closure
 
 Arguments:
- * `f`: the closure providing world densities
+ * `f`: the closure providing world data
  * `block`: the world zone for which to extract, and its subdivisions count
  * `threshold`: density value defining the iso-surface
  * `transition_sides`: the set of sides of the block which need to be adapted to neighbour double-resolution blocks (twice the subdivisions)
+ * `mesh_builder`: builder object on which functions will be called to append vertices and triangles
+ * The provided mesh_builder is returned back at the end.
 */
-pub fn extract_from_fn<D, FUN>(
-    f: FUN,
-    block: &Block<D::F>,
-    threshold: D,
+pub fn extract_from_fn<C, V, FUN, M>(
+    field: FUN,
+    block: &Block<C>,
+    threshold: V::Density,
     transition_sides: TransitionSides,
-) -> Mesh<D::F>
+    mesh_builder: M,
+) -> M
 where
-    D: Density,
-    FUN: Fn(D::F, D::F, D::F) -> D,
+    C: Coordinate,
+    V: VoxelData,
+    FUN: FnMut(C, C, C) -> V,
+    M: MeshBuilder<V, C>,
 {
-    let field = ScalarFieldForFn(f);
-    let mut source = WorldMappingVoxelSource { field, block };
-    Extractor::new(&mut source, block, threshold, transition_sides).extract()
-}
-
-/**
-Same as  [extract_from_fn] for mutable closures
-*/
-pub fn extract_from_fnmut<D, FUN>(
-    f: FUN,
-    block: &Block<D::F>,
-    threshold: D,
-    transition_sides: TransitionSides,
-) -> Mesh<D::F>
-where
-    D: Density,
-    FUN: FnMut(D::F, D::F, D::F) -> D,
-{
-    let field = ScalarFieldForFnMut(RefCell::new(f));
-    let mut source = WorldMappingVoxelSource { field, block };
-    Extractor::new(&mut source, block, threshold, transition_sides).extract()
+    let source = WorldMappingVoxelSource { field, block };
+    Extractor::new(source, block, threshold, transition_sides, mesh_builder).extract()
 }

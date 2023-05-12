@@ -1,17 +1,20 @@
 use std::f32::consts::PI;
 
 use bevy::input::{mouse::MouseButtonInput, ButtonState};
-use bevy::window::close_on_esc;
 use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
 use bevy::render::mesh::Mesh as BevyMesh;
+use bevy::window::close_on_esc;
+use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use transvoxel::structs::*;
 use transvoxel::transition_sides::*;
+use transvoxel::voxel_source::*;
 
 #[path = "../shared/models.rs"]
 mod models;
 use models::Model;
+
+#[path = "../shared/bevy_mesh.rs"]
+mod bevy_mesh;
 
 #[path = "../shared/shapes.rs"]
 mod shapes;
@@ -23,7 +26,6 @@ mod utils;
 #[path = "../shared/flycam.rs"]
 mod flycam;
 use flycam::{FlyCamera, FlyCameraPlugin};
-
 
 const MAIN_BLOCK: BlockDims<f32> = BlockDims {
     base: [0.0, 0.0, 0.0],
@@ -164,7 +166,8 @@ fn load_model(
         dims: MAIN_BLOCK,
         subdivisions: model_params.subdivisions,
     };
-    let bevy_mesh = utils::mesh_for_model(&model_params.model, wireframe, &block, &transition_sides);
+    let bevy_mesh =
+        utils::mesh_for_model(&model_params.model, wireframe, &block, &transition_sides);
     let mat = if wireframe {
         mats_cache.wireframe_model.clone()
     } else {

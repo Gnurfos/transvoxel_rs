@@ -1,70 +1,19 @@
 /*!
-Input/output world-related data structures for the algorithm
+A generic (engine independent) implementation of a Mesh, and an associated MeshBuilder
 */
 
 use std::fmt::Debug;
 use std::fmt::Display;
-use std::ops::Add;
-use std::ops::Mul;
 
 use num::Float;
 
-/**
-A cubic zone of the world, for which to run an extraction
-*/
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BlockDims<F>
-where F: Float
-{
-    /// Lowest x,y,z point
-    pub base: [F; 3],
-    /// Side of the cube
-    pub size: F,
-}
+use crate::mesh_builder::GridPoint;
+use crate::mesh_builder::MeshBuilder;
+use crate::mesh_builder::VertexIndex;
+use crate::traits::Density;
 
 /**
-A [Block] with attached number of subdivisions for the extraction
-With n subdivisions, the block will contain n cells, encompassing n + 1 voxels across each dimension
-```
-# use transvoxel::structs::*;
-// Just meant to be constructed and passed around
-let a_block = Block {
-    dims: BlockDims {
-        base: [10.0, 20.0, 30.0],
-        size: 10.0,
-    },
-    subdivisions: 8,
-};
-let another_block = Block::from([10.0, 20.0, 30.0], 10.0, 8);
-```
-*/
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Block<F>
-where F: Float,
-{
-    /// The zone
-    pub dims: BlockDims<F>,
-    /// How many subdivisions
-    pub subdivisions: usize,
-}
-
-impl<F> Block<F>
-where F: Float
-{
-    /// Shortcut constructor
-    pub fn from(base: [F; 3], size: F, subdivisions: usize) -> Self {
-        Block {
-            dims: BlockDims {
-                base: base,
-                size: size,
-            },
-            subdivisions: subdivisions,
-        }
-    }
-}
-
-/**
-Output mesh for the algorithm
+Mesh
 */
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -83,11 +32,46 @@ where
     pub triangle_indices: Vec<usize>,
 }
 
+/// A MeshBuilder that builds Mesh
+pub struct GenericMeshBuilder<F>
+where
+    F: Float,
+{
+    positions: Vec<F>,
+    normals: Vec<F>,
+    triangle_indices: Vec<usize>,
+    vertices: usize,
+}
+
+#[allow(clippy::new_without_default)]
+impl<F> GenericMeshBuilder<F>
+where
+    F: Float,
+{
+    /// Create a fresh builder
+    pub fn new() -> Self {
+        Self {
+            positions: vec![],
+            normals: vec![],
+            triangle_indices: vec![],
+            vertices: 0,
+        }
+    }
+    /// Output the Mesh
+    pub fn build(self) -> Mesh<F> {
+        Mesh {
+            positions: self.positions,
+            normals: self.normals,
+            triangle_indices: self.triangle_indices,
+        }
+    }
+}
+
 impl<F> Mesh<F>
 where
     F: Float,
 {
-    /// Shothand to get the triangles count
+    /// Shorthand to get the triangles count
     pub fn num_tris(&self) -> usize {
         self.triangle_indices.len() / 3
     }
@@ -139,7 +123,7 @@ where
                 ],
             });
         }
-        return tris;
+        tris
     }
 }
 
@@ -179,53 +163,42 @@ where
     }
 }
 
-/// A world space position
-pub struct Position<F> {
-    /// X
-    pub x: F,
-    /// Y
-    pub y: F,
-    /// Z
-    pub z: F,
-}
-
-impl<F> Position<F>
-where F: Float
-{
-    /// Interpolate between this `self` position and `other`, by the given `factor` (0 giving self, 1 giving other)
-    pub fn interp_toward(&self, other: &Position<F>, factor: F) -> Position<F> {
-        Position {
-            x: self.x + factor * (other.x - self.x),
-            y: self.y + factor * (other.y - self.y),
-            z: self.z + factor * (other.z - self.z),
-        }
+impl MeshBuilder<f32, f32> for GenericMeshBuilder<f32> {
+    fn add_vertex_between(
+        &mut self,
+        point_a: GridPoint<f32, f32>,
+        point_b: GridPoint<f32, f32>,
+        interp_toward_b: f32,
+    ) -> VertexIndex {
+        let position = point_a
+            .position
+            .interp_toward(&point_b.position, interp_toward_b);
+        let gradient_x =
+            point_a.gradient.0 + interp_toward_b * (point_b.gradient.0 - point_a.gradient.0);
+        let gradient_y =
+            point_a.gradient.1 + interp_toward_b * (point_b.gradient.1 - point_a.gradient.1);
+        let gradient_z =
+            point_a.gradient.2 + interp_toward_b * (point_b.gradient.2 - point_a.gradient.2);
+        let normal = f32::gradients_to_normal(gradient_x, gradient_y, gradient_z);
+        self.positions.push(position.x);
+        self.positions.push(position.y);
+        self.positions.push(position.z);
+        self.normals.push(normal[0]);
+        self.normals.push(normal[1]);
+        self.normals.push(normal[2]);
+        let index = self.vertices;
+        self.vertices += 1;
+        VertexIndex(index)
     }
-}
 
-impl<F> Mul<F> for &Position<F>
-where F: Float
-{
-    type Output = Position<F>;
-
-    fn mul(self, rhs: F) -> Self::Output {
-        Position {
-            x: self.x * rhs,
-            y: self.y * rhs,
-            z: self.z * rhs,
-        }
-    }
-}
-
-impl<F> Add<&[F; 3]> for &Position<F>
-where F: Float
-{
-    type Output = Position<F>;
-
-    fn add(self, rhs: &[F; 3]) -> Self::Output {
-        Position {
-            x: self.x + rhs[0],
-            y: self.y + rhs[1],
-            z: self.z + rhs[2],
-        }
+    fn add_triangle(
+        &mut self,
+        vertex_1_index: VertexIndex,
+        vertex_2_index: VertexIndex,
+        vertex_3_index: VertexIndex,
+    ) {
+        self.triangle_indices.push(vertex_1_index.0);
+        self.triangle_indices.push(vertex_2_index.0);
+        self.triangle_indices.push(vertex_3_index.0);
     }
 }

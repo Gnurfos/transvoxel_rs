@@ -22,18 +22,19 @@ To implement a fully consistent dynamic level-of-detail system, you will also pr
    * in that second case, the low resolution block must also be rendered with a transition face in the direction of the high resolution block
 Currently, it is not possible to "flip" a transition face status on a block, without re-extracting a new mesh for the block. Which means changing the resolution for one block can cascade through constraints to re-generating a few other blocks as well
 
+# New in version 1.0.0
+ * complete rework of the interfaces. Notably: you can now implement a [MeshBuilder] yourself
+ * removal of the `bevy_mesh` feature: There is code in our examples with various mesh builders for bevy
+
 # Basic usage
 Either try calling one of the functions in [extraction], or follow the example below:
 ```rust
-// The first thing you need is a density provider. You can implement a ScalarField for that
+// The first thing you need is a density provider. You can implement a DataField for that
 // but a simpler way, if you are just experimenting, is to use a function:
-use transvoxel::density::ScalarFieldForFn;
 
 fn sphere_density(x: f32, y: f32, z: f32) -> f32 {
     1f32 - (x * x + y * y + z * z).sqrt() / 5f32
 }
-
-let mut field = ScalarFieldForFn(sphere_density);
 
 // Going along with your density function, you need a threshold value for your density:
 // This is the value for which the surface will be generated. You can typically choose 0.
@@ -45,27 +46,32 @@ let threshold = 0f32;
 // Then you need to decide for which region of the world you want to generate the mesh, and how
 // many subdivisions should be used (the "resolution"). You also need to tell which sides of the
 // block need to be transition (double-resolution) faces. We use `no_side` here for simplicity,
-// and will get just a regular Marching Cubes extraction, but the Transvoxel transitions can be 
+// and will get just a regular Marching Cubes extraction, but the Transvoxel transitions can be
 // obtained simply by providing some sides instead (that is shown a bit later):
-use transvoxel::structs::Block;
-use transvoxel::transition_sides::no_side;
+use transvoxel::prelude::*;
 let subdivisions = 10;
 let block = Block::from([0.0, 0.0, 0.0], 10.0, subdivisions);
-let transition_sides = no_side();
+let transition_sides = transition_sides::no_side();
 
 // Finally, you can run the mesh extraction:
-use transvoxel::extraction::extract_from_field;
-let mesh = extract_from_field(&mut field, &block, threshold, transition_sides);
+use transvoxel::generic_mesh::GenericMeshBuilder;
+let builder = GenericMeshBuilder::new();
+let builder = extract_from_field(&sphere_density, &block, threshold, transition_sides, builder);
+let mesh = builder.build();
 assert!(mesh.tris().len() == 103);
 
 // Extracting with some transition faces results in a slightly more complex mesh:
-use transvoxel::transition_sides::TransitionSide::LowX;
-let mesh = extract_from_field(&mut field, &block, threshold, LowX.into());
+use transition_sides::TransitionSide::LowX;
+let builder = GenericMeshBuilder::new();
+let builder = extract_from_field(&sphere_density, &block, threshold, LowX.into(), builder);
+let mesh = builder.build();
 assert!(mesh.tris().len() == 131);
 
 // Unless, of course, the surface does not cross that face:
 use transvoxel::transition_sides::TransitionSide::HighZ;
-let mesh = extract_from_field(&mut field, &block, threshold, HighZ.into());
+let builder = GenericMeshBuilder::new();
+let builder = extract_from_field(&sphere_density, &block, threshold, HighZ.into(), builder);
+let mesh = builder.build();
 assert!(mesh.tris().len() == 103);
 ```
 
@@ -116,9 +122,6 @@ The first vertex is at position x=10.0, y=5.0, z=0.0 (the first 3 floats in posi
 As the first in the list, it's index is 0, and we can see it is used in the 2 triangles
 (the first triangle uses vertices 0 1 2, and the second triangle vertices 0 2 3)
 
-If you need to use the mesh in [Bevy](https://bevyengine.org/), you can enable feature `bevy_mesh` and use functions in [bevy_mesh] 
-
-[bevy_mesh]: crate::bevy_mesh
 
 # How to request transition sides
 ```rust
@@ -137,13 +140,13 @@ assert!(!sides.contains(TransitionSide::HighX));
 # Limitations / possible improvements
  * Provide a way to extract without normals, or with face normals, which would be much faster
  * Output/Input positions/normals are only f32. It should be feasible easily to extend that to f64
- * [Density] is limited to [Float] at the moment (only implemented for f32 and could be easily extended to f64). Some thinking would be needed for allowing more types, regarding interactions with gradients and interpolation of coordinates
  * Voxel densities caching is sub-optimal: probably only in the case of an empty block will densities be queried only once per voxel. In non-empty blocks, densities are very likely to be queried several times for some voxels
  * Algorithm improvements. See [Algorithm]
 
 [Algorithm]: crate::implementation::algorithm
 [Density]: crate::density::Density
 [Float]: num::Float
+[MeshBuilder]: crate::mesh_builder::MeshBuilder
 
 */
 #![warn(missing_docs)]
@@ -152,9 +155,11 @@ assert!(!sides.contains(TransitionSide::HighX));
 #[cfg(test)]
 mod unit_tests;
 
-pub mod density;
 pub mod extraction;
-pub mod structs;
+pub mod generic_mesh;
+pub mod mesh_builder;
+pub mod prelude;
+pub mod traits;
 pub mod transition_sides;
 pub mod voxel_coordinates;
 pub mod voxel_source;
@@ -165,7 +170,3 @@ pub use implementation::algorithm::shrink_if_needed;
 #[cfg(feature = "serde")]
 #[macro_use]
 extern crate serde;
-
-#[cfg(feature = "bevy_mesh")]
-#[cfg_attr(tvxl_docsrs, doc(cfg(feature = "bevy_mesh")))]
-pub mod bevy_mesh;

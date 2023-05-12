@@ -27,12 +27,12 @@ See [Rotation] for the definitions of UVW for each side of the block.
 */
 use std::ops::{Add, Sub};
 
-use crate::density::Coordinate;
+use crate::traits::Coordinate;
 
 use super::implementation::rotation::Rotation;
-use super::structs::{Block, Position};
+use super::mesh_builder::Position;
 use super::transition_sides::TransitionSide;
-
+use super::voxel_source::Block;
 
 /// Coordinates of a regular cell within the block. Go from 0 to BLOCK_SIZE - 1
 #[derive(Debug, PartialEq)]
@@ -68,7 +68,6 @@ pub struct RegularVoxelIndex {
 }
 
 impl Add<&RegularVoxelDelta> for &RegularCellIndex {
-
     type Output = RegularVoxelIndex;
 
     fn add(self, rhs: &RegularVoxelDelta) -> Self::Output {
@@ -81,7 +80,6 @@ impl Add<&RegularVoxelDelta> for &RegularCellIndex {
 }
 
 impl Add<RegularVoxelDelta> for &RegularVoxelIndex {
-
     type Output = RegularVoxelIndex;
 
     fn add(self, rhs: RegularVoxelDelta) -> Self::Output {
@@ -92,15 +90,6 @@ impl Add<RegularVoxelDelta> for &RegularVoxelIndex {
         }
     }
 }
-
-
-
-
-
-
-
-
-
 
 /// Index of a transition cell within a block
 #[derive(Copy, Clone, Debug)]
@@ -116,7 +105,11 @@ pub struct TransitionCellIndex {
 impl TransitionCellIndex {
     /// Shorthand constructor
     pub fn from(side: TransitionSide, cell_u: usize, cell_v: usize) -> Self {
-        Self { side, cell_u, cell_v }
+        Self {
+            side,
+            cell_u,
+            cell_v,
+        }
     }
 }
 
@@ -173,18 +166,16 @@ impl HighResolutionVoxelIndex {
         debug_assert!(rotation.side == self.cell.side);
         let cell_u = self.delta.u as usize / 2;
         let cell_v = self.delta.v as usize / 2;
-        let regular_index =
-            rotation.to_regular_voxel_index(block_subdivisions, &self.cell, cell_u, cell_v);
-        regular_index
+        rotation.to_regular_voxel_index(block_subdivisions, &self.cell, cell_u, cell_v)
     }
 
     /// Convert to a relative x, y, z position within the block (0,0,0 being at the block origin, 1,1,1 at the opposite max end)
     pub fn to_position_in_block<F>(&self, block: &Block<F>) -> Position<F>
-    where F: Coordinate,
+    where
+        F: Coordinate,
     {
         let rotation = Rotation::for_side(self.cell.side);
-        let position_in_block = rotation.to_position_in_block(block.subdivisions, self);
-        position_in_block
+        rotation.to_position_in_block(block.subdivisions, self)
     }
 
     /// `self` being a double-resolution voxel on a transition face in this block, it coincides with a regular voxel on the neighbouring block at that face. This gives that voxel's index within that block
