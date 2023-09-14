@@ -256,18 +256,16 @@ struct ModelMarkerComponent {}
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_plugins((FlyCameraPlugin, EguiPlugin))
         //.add_plugin(bevy_screen_diags::ScreenDiagsPlugin::default())
-        .add_startup_system(setup)
-        .add_startup_system(add_initial_model)
-        .add_plugin(FlyCameraPlugin)
-        .add_system(close_on_esc)
-        .add_plugin(EguiPlugin)
+        .add_systems(Startup, (setup, add_initial_model))
         .init_resource::<UiState>()
         .init_resource::<MaterialsResource>()
-        .add_system(ui)
         .add_event::<AppEvent>()
-        .add_system(app_events_handler)
-        .add_system(clicks_handler)
+        .add_systems(
+            Update,
+            (close_on_esc, ui, app_events_handler, clicks_handler),
+        )
         .run();
 }
 
@@ -370,6 +368,7 @@ struct MaterialsResource {
     pub grid_dot: Handle<StandardMaterial>,
 }
 
+#[derive(Event)]
 enum AppEvent {
     LoadModel,
     Quit,

@@ -262,14 +262,11 @@ struct ModelMarkerComponent {}
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_plugins((FlyCameraPlugin, EguiPlugin))
         //.add_plugin(bevy_screen_diags::ScreenDiagsPlugin::default())
-        .add_startup_system(setup)
-        .add_plugin(FlyCameraPlugin)
-        .add_system(close_on_esc)
-        .add_plugin(EguiPlugin)
+        .add_systems(Startup, setup)
         .init_resource::<MaterialsResource>()
-        .add_system(ui)
-        .add_system(clicks_handler)
+        .add_systems(Update, (close_on_esc, ui, clicks_handler))
         .run();
 }
 
