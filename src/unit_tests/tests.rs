@@ -14,9 +14,10 @@ use crate::{
 };
 use bevy::math::f32;
 use flagset::Flags;
-use hamcrest::prelude::*;
-use hamcrest::*;
+use hamcrest2::prelude::*;
 use rand::prelude::*;
+use rand::rng;
+use rand::Rng;
 
 #[test]
 fn it_works() {
@@ -443,14 +444,14 @@ fn random_data() {
     // Just to get some small confidence that it doesn't crash
     let seed = match env::var("TEST_SEED") {
         Ok(s) => s.parse::<u64>().unwrap(),
-        _ => random(),
+        _ => rng().random(),
     };
     println!("Using seed {}", seed);
     let mut rng = StdRng::seed_from_u64(seed);
-    let subdivisions = rng.gen_range(2..30);
+    let subdivisions = rng.random_range(2..30);
     let block = Block::from([0.0, 0.0, 0.0], 10.0, subdivisions);
     let sides = random_sides(&mut rng);
-    let source = |_, _, _| rng.gen_range(-1.0..1.0);
+    let source = |_, _, _| rng.random_range(-1.0..1.0);
     let m = GenericMeshBuilder::new();
     let m = extract_from_fn(source, &block, 0.5, sides, m).build();
     println!(
@@ -463,7 +464,7 @@ fn random_data() {
 fn random_sides(rng: &mut StdRng) -> TransitionSides {
     let mut sides = no_side();
     for s in TransitionSide::LIST {
-        if rng.gen_bool(0.5) {
+        if rng.random_bool(0.5) {
             let ss: TransitionSides = (*s).into();
             sides = sides | ss;
         }

@@ -1,9 +1,9 @@
 use std::f32::consts::PI;
 
+use bevy::color::palettes::css;
 use bevy::input::{mouse::MouseButtonInput, ButtonState};
 use bevy::prelude::*;
 use bevy::render::mesh::Mesh as BevyMesh;
-use bevy::window::close_on_esc;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use transvoxel::transition_sides::*;
@@ -50,15 +50,15 @@ fn load_materials(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     mut mats_cache: ResMut<MaterialsResource>,
 ) {
-    mats_cache.solid_model = materials.add(Color::rgb(0.8, 0.7, 0.6).into());
+    mats_cache.solid_model = materials.add(Color::srgb(0.8, 0.7, 0.6));
     mats_cache.wireframe_model = materials.add(StandardMaterial {
-        emissive: Color::BISQUE,
+        emissive: css::BISQUE.into(),
         unlit: true,
         ..Default::default()
     });
     mats_cache.grid = materials.add(StandardMaterial {
         base_color: Color::BLACK,
-        emissive: Color::rgb(0.6, 0.6, 0.6),
+        emissive: Color::srgb(0.6, 0.6, 0.6).into(),
         perceptual_roughness: 1.0,
         metallic: 0.0,
         reflectance: 0.0,
@@ -73,72 +73,68 @@ fn spawn_background(
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
     // Ground plane
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(BevyMesh::from(shape::Plane {
-            subdivisions: 4,
-            size: MAIN_BLOCK.size,
-        })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-        transform: Transform::from_xyz(
+    commands.spawn((
+        Mesh3d(
+            meshes.add(BevyMesh::from(
+                Plane3d::default()
+                    .mesh()
+                    .size(MAIN_BLOCK.size, MAIN_BLOCK.size)
+                    .subdivisions(4),
+            )),
+        ),
+        MeshMaterial3d(materials.add(Color::srgb(0.3, 0.5, 0.3))),
+        Transform::from_xyz(
             MAIN_BLOCK.size / 2.0 + MAIN_BLOCK.base[0],
             MAIN_BLOCK.base[1],
             MAIN_BLOCK.size / 2.0 + MAIN_BLOCK.base[2],
         ),
-        ..Default::default()
-    });
+    ));
     // Axis X
     let arrow = create_arrow();
     let arrow_handle = meshes.add(arrow);
-    commands.spawn(PbrBundle {
-        mesh: arrow_handle.clone(),
-        material: materials.add(Color::rgb(0.9, 0.2, 0.2).into()),
-        transform: Transform::from_xyz(0.5, 0.0, 0.0),
-        ..Default::default()
-    });
+    commands.spawn((
+        Mesh3d(arrow_handle.clone()),
+        MeshMaterial3d(materials.add(Color::srgb(0.9, 0.2, 0.2))),
+        Transform::from_xyz(0.5, 0.0, 0.0),
+    ));
     // Axis Y
-    commands.spawn(PbrBundle {
-        mesh: arrow_handle.clone(),
-        material: materials.add(Color::rgb(0.2, 0.9, 0.2).into()),
-        transform: Transform::from_xyz(0.0, 0.5, 0.0)
+    commands.spawn((
+        Mesh3d(arrow_handle.clone()),
+        MeshMaterial3d(materials.add(Color::srgb(0.2, 0.9, 0.2))),
+        Transform::from_xyz(0.0, 0.5, 0.0)
             * Transform::from_rotation(Quat::from_rotation_z(PI / 2.0)),
-        ..Default::default()
-    });
+    ));
     // Axis Z
-    commands.spawn(PbrBundle {
-        mesh: arrow_handle.clone(),
-        material: materials.add(Color::rgb(0.2, 0.2, 0.9).into()),
-        transform: Transform::from_xyz(0.0, 0.0, 0.5)
+    commands.spawn((
+        Mesh3d(arrow_handle.clone()),
+        MeshMaterial3d(materials.add(Color::srgb(0.2, 0.2, 0.9))),
+        Transform::from_xyz(0.0, 0.0, 0.5)
             * Transform::from_rotation(Quat::from_rotation_y(-PI / 2.0)),
-        ..Default::default()
-    });
+    ));
 }
 
 fn spawn_light(commands: &mut Commands) {
-    commands.spawn(PointLightBundle {
-        transform: Transform::from_xyz(10.0, 10.0, 10.0),
-        point_light: PointLight {
+    commands.spawn((
+        Transform::from_xyz(10.0, 10.0, 10.0),
+        PointLight {
             range: 100.0,
             radius: 250.0,
             ..Default::default()
         },
-        ..Default::default()
-    });
+    ));
 }
 
 fn spawn_camera(commands: &mut Commands) {
     let cam_transform =
         Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::new(5.0, 5.0, 5.0), Vec3::Y);
-    let mut cam_bundle = commands.spawn(Camera3dBundle {
-        transform: cam_transform,
-        ..Default::default()
-    });
+    let mut cam_bundle = commands.spawn((Camera3d::default(), cam_transform));
     cam_bundle.insert(FlyCamera {
         enabled: true,
         mouse_motion_enabled: false,
-        key_forward: KeyCode::Up,
-        key_backward: KeyCode::Down,
-        key_left: KeyCode::Left,
-        key_right: KeyCode::Right,
+        key_forward: KeyCode::ArrowUp,
+        key_backward: KeyCode::ArrowDown,
+        key_left: KeyCode::ArrowLeft,
+        key_right: KeyCode::ArrowRight,
         key_up: KeyCode::PageUp,
         key_down: KeyCode::PageDown,
         sensitivity: 9.0,
@@ -174,12 +170,11 @@ fn load_model(
         mats_cache.solid_model.clone()
     };
     commands
-        .spawn(PbrBundle {
-            mesh: meshes.add(bevy_mesh),
-            material: mat,
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            ..Default::default()
-        })
+        .spawn((
+            Mesh3d(meshes.add(bevy_mesh)),
+            MeshMaterial3d(mat),
+            Transform::from_xyz(0.0, 0.0, 0.0),
+        ))
         .insert(ModelMarkerComponent {});
     if model_params.show_grid {
         add_grid(
@@ -205,13 +200,12 @@ fn add_grid(
     };
     let grid_mesh = utils::grid_lines(&block, &transition_sides);
     commands
-        .spawn(PbrBundle {
-            mesh: meshes.add(grid_mesh),
-            material: mats_cache.grid.clone(),
-            ..Default::default()
-        })
+        .spawn((
+            Mesh3d(meshes.add(grid_mesh)),
+            MeshMaterial3d(mats_cache.grid.clone()),
+        ))
         .insert(ModelMarkerComponent {});
-    let cube = BevyMesh::from(shape::Cube { size: 1.0 });
+    let cube = BevyMesh::from(Cuboid::from_length(1.0));
     let cube_handle = meshes.add(cube);
     for (x, y, z) in utils::inside_grid_points(&model_params.model, &block, &transition_sides) {
         let cell_size = MAIN_BLOCK.size / model_params.subdivisions as f32;
@@ -225,12 +219,11 @@ fn add_grid(
         ));
         let translate = Transform::from_xyz(x, y, z);
         commands
-            .spawn(PbrBundle {
-                mesh: cube_handle.clone(),
-                material: mats_cache.grid_dot.clone(),
-                transform: translate * rotate * resize,
-                ..Default::default()
-            })
+            .spawn((
+                Mesh3d(cube_handle.clone()),
+                MeshMaterial3d(mats_cache.grid_dot.clone()),
+                translate * rotate * resize,
+            ))
             .insert(ModelMarkerComponent {});
     }
 }
@@ -247,10 +240,7 @@ fn main() {
         .init_resource::<UiState>()
         .init_resource::<MaterialsResource>()
         .add_event::<AppEvent>()
-        .add_systems(
-            Update,
-            (close_on_esc, ui, app_events_handler, clicks_handler),
-        )
+        .add_systems(Update, (ui, app_events_handler, clicks_handler))
         .run();
 }
 
@@ -285,7 +275,7 @@ fn ui(
         }
         const MAX_SUB: usize = 30;
         if ui.add(
-            egui::Slider::new(&mut ui_state.desired_things.subdivisions, 1..=MAX_SUB).text("Subdivisions").clamp_to_range(true)
+            egui::Slider::new(&mut ui_state.desired_things.subdivisions, 1..=MAX_SUB).text("Subdivisions").clamping(egui::SliderClamping::Always)
         ).changed() {
             model_changed = true;
         }
@@ -367,7 +357,7 @@ fn app_events_handler(
     models_query: Query<(Entity, &ModelMarkerComponent)>,
     ui_state: Res<UiState>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         match event {
             AppEvent::LoadModel => {
                 let params = &ui_state.desired_things;
@@ -384,7 +374,7 @@ fn app_events_handler(
 }
 
 fn clicks_handler(mut events: EventReader<MouseButtonInput>, mut cam_query: Query<&mut FlyCamera>) {
-    for event in events.iter() {
+    for event in events.read() {
         if event.button == MouseButton::Left {
             if event.state == ButtonState::Pressed {
                 for mut cam in cam_query.iter_mut() {

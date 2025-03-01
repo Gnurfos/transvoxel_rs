@@ -1,6 +1,7 @@
 use bevy::{
-    math::Vec3,
-    prelude::{shape, Transform},
+    asset::RenderAssetUsages,
+    math::{primitives::Cuboid, Vec3},
+    prelude::Transform,
     render::{
         mesh::{Indices, Mesh as BevyMesh, VertexAttributeValues},
         render_resource::PrimitiveTopology,
@@ -8,8 +9,8 @@ use bevy::{
 };
 
 pub fn create_arrow() -> BevyMesh {
-    let shaft = BevyMesh::from(shape::Box::new(1.0, 0.1, 0.1));
-    let head = BevyMesh::from(shape::Cube { size: 0.2 });
+    let shaft = BevyMesh::from(Cuboid::new(1.0, 0.1, 0.1));
+    let head = BevyMesh::from(Cuboid::from_length(0.2));
     let arrow = merge(shaft, head);
     arrow
 }
@@ -76,11 +77,14 @@ fn merge(mesh1: BevyMesh, mesh2: BevyMesh) -> BevyMesh {
         }
     };
 
-    let mut mesh = BevyMesh::new(PrimitiveTopology::TriangleList);
+    let mut mesh = BevyMesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
+    );
     mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_attribute(BevyMesh::ATTRIBUTE_UV_0, uvs);
-    mesh.set_indices(Some(indices));
+    mesh.insert_indices(indices);
     mesh
 }
 

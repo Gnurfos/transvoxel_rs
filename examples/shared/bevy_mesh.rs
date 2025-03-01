@@ -2,6 +2,7 @@
 This module contains mesh builders to produce [Bevy](https://bevyengine.org/) meshes.
 */
 
+use bevy::asset::RenderAssetUsages;
 use bevy::render::mesh::Mesh;
 use bevy::render::render_resource::PrimitiveTopology::{LineList, TriangleList};
 use transvoxel::{mesh_builder::*, traits::*};
@@ -23,9 +24,9 @@ impl BevyMeshBuilder {
     from our mesh, but UV coordinates all set to 0
     */
     pub fn build(self) -> Mesh {
-        let mut bevy_mesh = Mesh::new(TriangleList);
+        let mut bevy_mesh = Mesh::new(TriangleList, RenderAssetUsages::default());
         let indices = bevy::render::mesh::Indices::U32(self.triangle_indices);
-        bevy_mesh.set_indices(Some(indices));
+        bevy_mesh.insert_indices(indices);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, self.positions);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals);
         return bevy_mesh;
@@ -36,7 +37,7 @@ impl BevyMeshBuilder {
     Lines shared between 2 triangles are repeated, for implementation simplicity.
     */
     pub fn build_wireframe(self) -> Mesh {
-        let mut bevy_mesh = Mesh::new(LineList);
+        let mut bevy_mesh = Mesh::new(LineList, RenderAssetUsages::default());
         let tris_count = self.triangle_indices.len() / 3;
         let indices = (0..tris_count)
             .map(|i| vec![3 * i, 3 * i + 1, 3 * i + 1, 3 * i + 2, 3 * i + 2, 3 * i])
@@ -44,7 +45,7 @@ impl BevyMeshBuilder {
             .map(|j| self.triangle_indices[j] as u32)
             .collect();
         let indices = bevy::render::mesh::Indices::U32(indices);
-        bevy_mesh.set_indices(Some(indices));
+        bevy_mesh.insert_indices(indices);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, self.positions);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals);
         return bevy_mesh;
