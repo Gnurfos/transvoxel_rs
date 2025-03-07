@@ -39,7 +39,7 @@ fn load_materials(
 
 fn spawn_light(_commands: &mut Commands, mut ambient_light: ResMut<AmbientLight>) {
     ambient_light.color = Color::srgb(1.0, 1.0, 1.0);
-    ambient_light.brightness = 1.0;
+    ambient_light.brightness = 100.0;
 }
 
 fn spawn_camera(commands: &mut Commands) {
