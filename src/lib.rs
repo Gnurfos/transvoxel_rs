@@ -20,6 +20,7 @@ To implement a fully consistent dynamic level-of-detail system, you will also pr
  * track yourself constraints:
    * two rendered adjacent blocks can only either have the same resolution, or one have double the resolution of the other
    * in that second case, the low resolution block must also be rendered with a transition face in the direction of the high resolution block
+
 Currently, it is not possible to "flip" a transition face status on a block, without re-extracting a new mesh for the block. Which means changing the resolution for one block can cascade through constraints to re-generating a few other blocks as well
 
 # New in version 1.0.0

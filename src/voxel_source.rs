@@ -106,7 +106,7 @@ where
     pub block: &'b Block<C>,
 }
 
-impl<'b, S, V, C> VoxelSource<V> for WorldMappingVoxelSource<'b, S, C>
+impl<S, V, C> VoxelSource<V> for WorldMappingVoxelSource<'_, S, C>
 where
     S: DataField<V, C>,
     C: Coordinate,
@@ -132,10 +132,7 @@ where
     }
 }
 
-/**
-VoxelSource implementation for references
-*/
-
+/// VoxelSource implementation for references
 impl<V, F> VoxelSource<V> for &mut F
 where
     V: VoxelData,

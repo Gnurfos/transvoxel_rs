@@ -39,12 +39,12 @@ fn field_model(
     transition_sides: &TransitionSides,
 ) -> BevyMesh {
     let source = WorldMappingVoxelSource {
-        field: field,
-        block: &block,
+        field,
+        block,
     };
     let builder = extract(
         source,
-        &block,
+        block,
         models::THRESHOLD,
         *transition_sides,
         BevyMeshBuilder::default(),
@@ -92,7 +92,7 @@ fn inside_grid_points_for_field(
             }
         }
     }
-    return result;
+    result
 }
 
 pub fn grid_lines(block: &Block<f32>, transition_sides: &TransitionSides) -> BevyMesh {
@@ -208,7 +208,7 @@ pub fn grid_lines(block: &Block<f32>, transition_sides: &TransitionSides) -> Bev
     bevy_mesh.insert_indices(bevy::render::mesh::Indices::U32(indices));
     bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, positions);
     bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, normals);
-    return bevy_mesh;
+    bevy_mesh
 }
 
 fn high_res_face_grid_point_position(

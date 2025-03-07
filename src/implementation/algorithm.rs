@@ -19,10 +19,11 @@ Some complexity lies in the details:
 Terminology:
  - a `voxel` is a point on the densities grid. They are evenly spaced for a given resolution. Densities will be queried for voxels
  - a `grid point` is a  point ou our morphed grid. They will be used for output: a vertex is generated between 2 grid points
+
  For most regular cells, the 8 voxels and 8 grid points coincide.
-For a regular cell touching one transition face of the block, 4 of the grid points will be shifted toward the inside of the block and not coincide with their origin voxels anymore
-For a regular cell touching two transition faces, 6 such grid points are shifted away from their voxel
-For a regular cell touching three transition faces, 7 grid points are shifted
+ For a regular cell touching one transition face of the block, 4 of the grid points will be shifted toward the inside of the block and not coincide with their origin voxels anymore
+ For a regular cell touching two transition faces, 6 such grid points are shifted away from their voxel
+ For a regular cell touching three transition faces, 7 grid points are shifted
 
 Known room for improvements:
  - we never place a vertex exactly on a grid point. Since a vertex would only appear between greid points when one density is above the threshold and the other below, they should be different. If the densities are too close, we will place a verted in the middle of the grid points. As a consequence, we don't make use of TRANSITION_CORNER_DATA (illustrated in 4.19 in Lengyel's paper), which handles the reusing of previous cell vertex in the case the vertex is positionned exactly on a voxel

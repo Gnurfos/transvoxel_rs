@@ -29,7 +29,7 @@ impl BevyMeshBuilder {
         bevy_mesh.insert_indices(indices);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, self.positions);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals);
-        return bevy_mesh;
+        bevy_mesh
     }
     /**
     Convert to a Bevy mesh lines list, with positions and normals
@@ -40,15 +40,14 @@ impl BevyMeshBuilder {
         let mut bevy_mesh = Mesh::new(LineList, RenderAssetUsages::default());
         let tris_count = self.triangle_indices.len() / 3;
         let indices = (0..tris_count)
-            .map(|i| vec![3 * i, 3 * i + 1, 3 * i + 1, 3 * i + 2, 3 * i + 2, 3 * i])
-            .flatten()
-            .map(|j| self.triangle_indices[j] as u32)
+            .flat_map(|i| vec![3 * i, 3 * i + 1, 3 * i + 1, 3 * i + 2, 3 * i + 2, 3 * i])
+            .map(|j| self.triangle_indices[j])
             .collect();
         let indices = bevy::render::mesh::Indices::U32(indices);
         bevy_mesh.insert_indices(indices);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, self.positions);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals);
-        return bevy_mesh;
+        bevy_mesh
     }
 }
 
@@ -76,7 +75,7 @@ where
         self.normals.push(normal);
         let index = self.vertices;
         self.vertices += 1;
-        return VertexIndex(index);
+        VertexIndex(index)
     }
 
     fn add_triangle(

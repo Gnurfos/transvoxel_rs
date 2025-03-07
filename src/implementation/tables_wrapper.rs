@@ -36,8 +36,8 @@ impl RegularVertexData {
     }
 }
 
-/// The low byte contains the indices for the two endpoints of the edge on which the vertex lies.
-/// The high byte contains the vertex reuse data.
+// The low byte contains the indices for the two endpoints of the edge on which the vertex lies.
+// The high byte contains the vertex reuse data.
 
 pub struct TransitionVertexData(pub u16);
 

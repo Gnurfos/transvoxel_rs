@@ -41,7 +41,7 @@ fn blocks_to_show(
                 subdivisions: base_subdivisions,
             },
             if with_transitions {
-                (TransitionSide::LowX | TransitionSide::LowZ).into()
+                TransitionSide::LowX | TransitionSide::LowZ
             } else {
                 no_side()
             },
@@ -181,7 +181,7 @@ fn spawn_camera(commands: &mut Commands) {
             &blocks_to_show(model_params.subdivisions, model_params.with_transitions)
         {
             let bevy_mesh =
-                utils::mesh_for_model(&model_params.model, wireframe, &block, &transition_sides);
+                utils::mesh_for_model(&model_params.model, wireframe, block, transition_sides);
             let mat = if wireframe {
                 mats_cache.wireframe_model.clone()
             } else {
@@ -200,8 +200,8 @@ fn spawn_camera(commands: &mut Commands) {
                     meshes,
                     mats_cache,
                     model_params,
-                    &block,
-                    &transition_sides,
+                    block,
+                    transition_sides,
                 );
             }
         }
@@ -215,7 +215,7 @@ fn spawn_camera(commands: &mut Commands) {
         block: &Block<f32>,
         transition_sides: &TransitionSides,
     ) {
-        let grid_mesh = utils::grid_lines(&block, &transition_sides);
+        let grid_mesh = utils::grid_lines(block, transition_sides);
         commands
             .spawn((
                 Mesh3d(meshes.add(grid_mesh)),
@@ -224,7 +224,7 @@ fn spawn_camera(commands: &mut Commands) {
             .insert(ModelMarkerComponent {});
         let cube = Mesh::from(Cuboid::from_length(1.0));
         let cube_handle = meshes.add(cube);
-        for (x, y, z) in utils::inside_grid_points(&model_params.model, &block, &transition_sides) {
+        for (x, y, z) in utils::inside_grid_points(&model_params.model, block, transition_sides) {
             let cell_size = block.dims.size / block.subdivisions as f32;
             let point_size = cell_size * 0.05;
             let resize = Transform::from_scale(Vec3::new(point_size, point_size, point_size));
@@ -345,7 +345,7 @@ fn spawn_camera(commands: &mut Commands) {
         pub fn set_model(&mut self, model: Model) -> bool {
             let changed = self.desired_things.model != model;
             self.desired_things.model = model;
-            return changed;
+            changed
         }
         pub fn get_model(&self) -> Model {
             self.desired_things.model
@@ -381,7 +381,7 @@ fn spawn_camera(commands: &mut Commands) {
                     for (entity, _) in models_query.iter() {
                         commands.entity(entity).despawn();
                     }
-                    load_model(&mut commands, &mut meshes, &mats_cache, &params);
+                    load_model(&mut commands, &mut meshes, &mats_cache, params);
                 }
                 AppEvent::Quit => {
                     std::process::exit(0);

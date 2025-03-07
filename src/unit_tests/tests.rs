@@ -319,8 +319,7 @@ fn simple_sphere() {
             let distance_from_center =
                 ((x - 10f32) * (x - 10f32) + (y - 10f32) * (y - 10f32) + (z - 10f32) * (z - 10f32))
                     .sqrt();
-            let d = 1f32 - distance_from_center / 5f32;
-            d
+            1f32 - distance_from_center / 5f32
         }
     }
     let block = Block::from([0.0, 0.0, 0.0], 20.0, 2);
@@ -362,11 +361,11 @@ impl<'b, S> CountingField<'b, S> {
     pub fn new(source: S, block: &'b Block<f32>) -> Self {
         let underlying = WorldMappingVoxelSource::<'b, S, f32> {
             field: source,
-            block: block,
+            block,
         };
         Self {
             calls: 0,
-            underlying: underlying,
+            underlying,
         }
     }
     pub fn count(&self) -> usize {
@@ -374,7 +373,7 @@ impl<'b, S> CountingField<'b, S> {
     }
 }
 #[allow(unused_variables)]
-impl<'b, S> VoxelSource<f32> for CountingField<'b, S>
+impl<S> VoxelSource<f32> for CountingField<'_, S>
 where
     S: DataField<f32, f32>,
 {
@@ -412,7 +411,7 @@ fn count_density_calls_minimal() {
         &mut source,
         &block,
         0.5,
-        (TransitionSide::LowX | TransitionSide::LowZ).into(),
+        TransitionSide::LowX | TransitionSide::LowZ,
         m,
     );
     // Just query each voxel once for finding the case, but needs the 2 high-res face voxels too
@@ -466,7 +465,7 @@ fn random_sides(rng: &mut StdRng) -> TransitionSides {
     for s in TransitionSide::LIST {
         if rng.random_bool(0.5) {
             let ss: TransitionSides = (*s).into();
-            sides = sides | ss;
+            sides |= ss;
         }
     }
     sides
@@ -487,11 +486,9 @@ fn test_regular_cache_extended_loaded() {
     let block = Block::from([0.0, 0.0, 0.0], size, subdivisions);
     let sides = TransitionSide::LowX.into();
     let source = |x: f32, y: f32, z: f32| {
-        if (x - 0.0).abs() > f32::EPSILON {
-            0f32
-        } else if (y - 1.5).abs() > f32::EPSILON {
-            0f32
-        } else if (z - 1.0).abs() > f32::EPSILON {
+        if ((x - 0.0).abs() > f32::EPSILON)
+            || ((y - 1.5).abs() > f32::EPSILON)
+            || ((z - 1.0).abs() > f32::EPSILON) {
             0f32
         } else {
             1f32

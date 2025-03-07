@@ -11,8 +11,7 @@ use bevy::{
 pub fn create_arrow() -> BevyMesh {
     let shaft = BevyMesh::from(Cuboid::new(1.0, 0.1, 0.1));
     let head = BevyMesh::from(Cuboid::from_length(0.2));
-    let arrow = merge(shaft, head);
-    arrow
+    merge(shaft, head)
 }
 
 fn merge(mesh1: BevyMesh, mesh2: BevyMesh) -> BevyMesh {
@@ -88,7 +87,7 @@ fn merge(mesh1: BevyMesh, mesh2: BevyMesh) -> BevyMesh {
     mesh
 }
 
-fn append_f3(dest: &mut Vec<[f32; 3]>, src: &VertexAttributeValues, transform: &Transform) -> () {
+fn append_f3(dest: &mut Vec<[f32; 3]>, src: &VertexAttributeValues, transform: &Transform) {
     if let VertexAttributeValues::Float32x3(values) = src {
         for value in values.iter() {
             let mut new_val = Vec3::from((value[0], value[1], value[2]));
@@ -100,7 +99,7 @@ fn append_f3(dest: &mut Vec<[f32; 3]>, src: &VertexAttributeValues, transform: &
     }
 }
 
-fn append_f2(dest: &mut Vec<[f32; 2]>, src: &VertexAttributeValues) -> () {
+fn append_f2(dest: &mut Vec<[f32; 2]>, src: &VertexAttributeValues) {
     if let VertexAttributeValues::Float32x2(values) = src {
         for value in values.iter() {
             dest.push(*value);

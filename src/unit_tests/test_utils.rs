@@ -88,7 +88,7 @@ impl hamcrest2::core::Matcher<Triangle<f32>> for TriMatcher {
         if same {
             success()
         } else {
-            return Err(format!("{:?} not the same tri as {:?}", &actual, &self));
+            Err(format!("{:?} not the same tri as {:?}", &actual, &self))
         }
     }
 }
@@ -100,17 +100,18 @@ fn rotate(t: Triangle<f32>) -> Triangle<f32> {
 }
 
 fn same_pos(t1: Triangle<f32>, t2: Triangle<f32>) -> bool {
-    return (t1.vertices[0].position == t2.vertices[0].position)
+    (t1.vertices[0].position == t2.vertices[0].position)
         && (t1.vertices[1].position == t2.vertices[1].position)
-        && (t1.vertices[2].position == t2.vertices[2].position);
+        && (t1.vertices[2].position == t2.vertices[2].position)
 }
 
 fn same_pos_and_normal(t1: Triangle<f32>, t2: Triangle<f32>) -> bool {
-    return (t1.vertices[0] == t2.vertices[0])
+    (t1.vertices[0] == t2.vertices[0])
         && (t1.vertices[1] == t2.vertices[1])
-        && (t1.vertices[2] == t2.vertices[2]);
+        && (t1.vertices[2] == t2.vertices[2])
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn tri_matcher(
     x1: f32,
     y1: f32,
@@ -123,15 +124,15 @@ pub fn tri_matcher(
     z3: f32,
 ) -> TriMatcher {
     TriMatcher {
-        x1: x1,
-        y1: y1,
-        z1: z1,
-        x2: x2,
-        y2: y2,
-        z2: z2,
-        x3: x3,
-        y3: y3,
-        z3: z3,
+        x1,
+        y1,
+        z1,
+        x2,
+        y2,
+        z2,
+        x3,
+        y3,
+        z3,
         match_normals: false,
         nx1: 0.0,
         ny1: 0.0,
@@ -153,6 +154,7 @@ pub fn tri_matcher_vecs(
     tri_matcher(v1.0, v1.1, v1.2, v2.0, v2.1, v2.2, v3.0, v3.1, v3.2)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn tri_matcher_with_normals(
     x1: f32,
     y1: f32,
@@ -174,28 +176,29 @@ pub fn tri_matcher_with_normals(
     nz3: f32,
 ) -> TriMatcher {
     TriMatcher {
-        x1: x1,
-        y1: y1,
-        z1: z1,
-        x2: x2,
-        y2: y2,
-        z2: z2,
-        x3: x3,
-        y3: y3,
-        z3: z3,
+        x1,
+        y1,
+        z1,
+        x2,
+        y2,
+        z2,
+        x3,
+        y3,
+        z3,
         match_normals: true,
-        nx1: nx1,
-        ny1: ny1,
-        nz1: nz1,
-        nx2: nx2,
-        ny2: ny2,
-        nz2: nz2,
-        nx3: nx3,
-        ny3: ny3,
-        nz3: nz3,
+        nx1,
+        ny1,
+        nz1,
+        nx2,
+        ny2,
+        nz2,
+        nx3,
+        ny3,
+        nz3,
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn make_tri(
     x1: f32,
     y1: f32,
@@ -225,6 +228,7 @@ pub fn make_tri(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn make_tri_with_normals(
     x1: f32,
     y1: f32,
@@ -310,7 +314,7 @@ fn format_list<T: Display>(list: Vec<T>) -> String {
         res += " - ";
         res += &format!("{}", item);
     }
-    return res;
+    res
 }
 
 macro_rules! tris {
@@ -340,7 +344,7 @@ pub fn restrict(
     let fully_in_cube = |tri: &Triangle<f32>| {
         in_cube(&tri.vertices[0]) && in_cube(&tri.vertices[1]) && in_cube(&tri.vertices[2])
     };
-    return tris.into_iter().filter(fully_in_cube).collect();
+    tris.into_iter().filter(fully_in_cube).collect()
 }
 
 /**
@@ -348,7 +352,6 @@ BLOCK_SIZE means there are that many cells across every dimension
 ex: BLOCK_SIZE=3 means a 3x3x3 cells block, thus storing 4x4x4 density points for the block itself
 The points outside of this (-1 and BLOCK_SIZE + 1 can be accessed for gradients) are also allocated, resulting in a 5x5x5 array
 */
-
 pub struct DensityArray<D>
 where
     D: Density + Default,
@@ -369,6 +372,7 @@ where
         ]] = value;
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn set_inter(
         &mut self,
         side: TransitionSide,
@@ -440,7 +444,7 @@ impl<D: Density> VoxelSource<D> for DensityArray<D> {
         );
         // This is for computing a gradient
         // Then return whatever because we don't care about normals in this implementation
-        return D::default();
+        D::default()
     }
 }
 

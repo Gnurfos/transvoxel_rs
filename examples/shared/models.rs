@@ -36,7 +36,7 @@ pub fn models_map() -> HashMap<Model, Box<dyn DataField<f32, f32>>> {
     fields.insert(Model::Plane, Box::new(ObliquePlane {}));
     fields.insert(Model::Wave, Box::new(Wave {}));
     fields.insert(Model::Noise, Box::new(Noise::new()));
-    return fields;
+    fields
 }
 
 pub const THRESHOLD: f32 = 0.;
@@ -67,8 +67,7 @@ impl DataField<f32, f32> for Sphere {
             + (y - self.cy) * (y - self.cy)
             + (z - self.cz) * (z - self.cz))
             .sqrt();
-        let d = 1f32 - distance_from_center / self.r;
-        d
+        1f32 - distance_from_center / self.r
     }
 }
 

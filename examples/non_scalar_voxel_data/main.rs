@@ -70,7 +70,7 @@ enum Material {
 }
 
 impl Material {
-    pub fn to_color(&self) -> Option<[f32; 4]> {
+    pub fn to_color(self) -> Option<[f32; 4]> {
         match self {
             Material::Nothing => None,
             Material::Soil => Some([0.8, 0.7, 0.6, 1.0]),
@@ -112,7 +112,7 @@ impl CustomMeshBuilder {
         bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, self.positions);
         bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, self.normals);
         bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_COLOR, self.colors);
-        return bevy_mesh;
+        bevy_mesh
     }
 }
 
@@ -151,7 +151,7 @@ impl MeshBuilder<CustomVoxelData, f32> for CustomMeshBuilder {
         self.colors.push(color);
         let index = self.vertices;
         self.vertices += 1;
-        return VertexIndex(index);
+        VertexIndex(index)
     }
 
     fn add_triangle(
@@ -192,9 +192,7 @@ fn field(x: f32, y: f32, z: f32) -> CustomVoxelData {
     let hole_center = (5.0, 10.0, 5.0);
     let distance_to_hole = distance(x, y, z, hole_center.0, hole_center.1, hole_center.2);
     // Computations
-    let density = if distance_to_hole < hole_radius {
-        0.0
-    } else if y >= ground_level {
+    let density = if (distance_to_hole < hole_radius) || (y >= ground_level) {
         0.0
     } else {
         1.0
