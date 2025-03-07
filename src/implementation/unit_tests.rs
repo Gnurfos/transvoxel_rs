@@ -1,7 +1,6 @@
 use super::super::transition_sides::TransitionSide::*;
 use super::super::voxel_coordinates::{HighResolutionVoxelIndex, RegularVoxelIndex};
-use hamcrest::prelude::*;
-use hamcrest::*;
+use hamcrest2::prelude::*;
 
 #[test]
 fn index_conversion() {

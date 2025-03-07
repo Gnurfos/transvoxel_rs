@@ -1,8 +1,9 @@
+use bevy::asset::RenderAssetUsages;
 use bevy::input::{mouse::MouseButtonInput, ButtonState};
 use bevy::prelude::Mesh as BevyMesh;
 use bevy::prelude::*;
 use bevy::render::render_resource::PrimitiveTopology::TriangleList;
-use bevy::window::close_on_esc;
+
 use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use transvoxel::mesh_builder::{GridPoint, MeshBuilder, VertexIndex};
@@ -33,28 +34,25 @@ fn load_materials(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     mats_cache: &mut ResMut<MaterialsResource>,
 ) {
-    mats_cache.solid_model = materials.add(Color::rgb(1.0, 1.0, 1.0).into());
+    mats_cache.solid_model = materials.add(Color::srgb(1.0, 1.0, 1.0));
 }
 
 fn spawn_light(_commands: &mut Commands, mut ambient_light: ResMut<AmbientLight>) {
-    ambient_light.color = Color::rgb(1.0, 1.0, 1.0);
-    ambient_light.brightness = 1.0;
+    ambient_light.color = Color::srgb(1.0, 1.0, 1.0);
+    ambient_light.brightness = 100.0;
 }
 
 fn spawn_camera(commands: &mut Commands) {
     let cam_transform =
         Transform::from_xyz(30.0, 40.0, 30.0).looking_at(Vec3::new(5.0, 5.0, 5.0), Vec3::Y);
-    let mut cam_bundle = commands.spawn(Camera3dBundle {
-        transform: cam_transform,
-        ..Default::default()
-    });
+    let mut cam_bundle = commands.spawn((Camera3d::default(), cam_transform));
     cam_bundle.insert(FlyCamera {
         enabled: true,
         mouse_motion_enabled: false,
-        key_forward: KeyCode::Up,
-        key_backward: KeyCode::Down,
-        key_left: KeyCode::Left,
-        key_right: KeyCode::Right,
+        key_forward: KeyCode::ArrowUp,
+        key_backward: KeyCode::ArrowDown,
+        key_left: KeyCode::ArrowLeft,
+        key_right: KeyCode::ArrowRight,
         key_up: KeyCode::PageUp,
         key_down: KeyCode::PageDown,
         sensitivity: 9.0,
@@ -107,10 +105,10 @@ struct CustomMeshBuilder {
 
 impl CustomMeshBuilder {
     pub fn build(self) -> BevyMesh {
-        let mut bevy_mesh = BevyMesh::new(TriangleList);
+        let mut bevy_mesh = BevyMesh::new(TriangleList, RenderAssetUsages::default());
         let converted_indices: Vec<u32> = self.triangle_indices.iter().map(|i| *i as u32).collect();
         let indices = bevy::render::mesh::Indices::U32(converted_indices);
-        bevy_mesh.set_indices(Some(indices));
+        bevy_mesh.insert_indices(indices);
         bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, self.positions);
         bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, self.normals);
         bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_COLOR, self.colors);
@@ -244,12 +242,11 @@ fn load_model(
                 let bevy_mesh = mesh_builder.build();
                 let mat = mats_cache.solid_model.clone();
                 commands
-                    .spawn(PbrBundle {
-                        mesh: meshes.add(bevy_mesh),
-                        material: mat,
-                        transform: Transform::from_xyz(0.0, 0.0, 0.0),
-                        ..Default::default()
-                    })
+                    .spawn((
+                        Mesh3d(meshes.add(bevy_mesh)),
+                        MeshMaterial3d(mat),
+                        Transform::from_xyz(0.0, 0.0, 0.0),
+                    ))
                     .insert(ModelMarkerComponent {});
             }
         }
@@ -266,7 +263,7 @@ fn main() {
         //.add_plugin(bevy_screen_diags::ScreenDiagsPlugin::default())
         .add_systems(Startup, setup)
         .init_resource::<MaterialsResource>()
-        .add_systems(Update, (close_on_esc, ui, clicks_handler))
+        .add_systems(Update, (ui, clicks_handler))
         .run();
 }
 
@@ -286,7 +283,7 @@ struct MaterialsResource {
 }
 
 fn clicks_handler(mut events: EventReader<MouseButtonInput>, mut cam_query: Query<&mut FlyCamera>) {
-    for event in events.iter() {
+    for event in events.read() {
         if event.button == MouseButton::Left {
             if event.state == ButtonState::Pressed {
                 for mut cam in cam_query.iter_mut() {

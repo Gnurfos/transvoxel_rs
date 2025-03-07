@@ -1,5 +1,6 @@
 use crate::bevy_mesh::BevyMeshBuilder;
 use crate::models;
+use bevy::asset::RenderAssetUsages;
 use bevy::render::mesh::Mesh as BevyMesh;
 use transvoxel::shrink_if_needed;
 use transvoxel::transition_sides::*;
@@ -96,7 +97,10 @@ fn inside_grid_points_for_field(
 
 pub fn grid_lines(block: &Block<f32>, transition_sides: &TransitionSides) -> BevyMesh {
     let subs = block.subdivisions;
-    let mut bevy_mesh = BevyMesh::new(bevy::render::render_resource::PrimitiveTopology::LineList);
+    let mut bevy_mesh = BevyMesh::new(
+        bevy::render::render_resource::PrimitiveTopology::LineList,
+        RenderAssetUsages::default(),
+    );
     let mut positions = Vec::<[f32; 3]>::new();
     let mut indices = Vec::<u32>::new();
     for i in 0..=subs {
@@ -201,7 +205,7 @@ pub fn grid_lines(block: &Block<f32>, transition_sides: &TransitionSides) -> Bev
         }
     }
     let normals = positions.clone(); // Not really important for lines ?
-    bevy_mesh.set_indices(Some(bevy::render::mesh::Indices::U32(indices)));
+    bevy_mesh.insert_indices(bevy::render::mesh::Indices::U32(indices));
     bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, positions);
     bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, normals);
     return bevy_mesh;

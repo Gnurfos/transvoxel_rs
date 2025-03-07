@@ -61,8 +61,8 @@ impl Display for TriMatcher {
     }
 }
 
-impl hamcrest::core::Matcher<Triangle<f32>> for TriMatcher {
-    fn matches(&self, actual: Triangle<f32>) -> hamcrest::core::MatchResult {
+impl hamcrest2::core::Matcher<Triangle<f32>> for TriMatcher {
+    fn matches(&self, actual: Triangle<f32>) -> hamcrest2::core::MatchResult {
         let tris_match = if self.match_normals {
             same_pos_and_normal
         } else {
@@ -278,7 +278,7 @@ impl Display for TrianglesMatcher {
     }
 }
 
-use hamcrest::core::*;
+use hamcrest2::core::*;
 impl Matcher<Vec<Triangle<f32>>> for TrianglesMatcher {
     fn matches(&self, actual: Vec<Triangle<f32>>) -> MatchResult {
         let mut rem = actual.clone();
