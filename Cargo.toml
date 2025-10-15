@@ -1,6 +1,6 @@
 [package]
 name = "transvoxel"
-version = "1.2.0"
+version = "2.0.0"
 authors = ["Seb E. <seb@nospam.org>"]
 edition = "2018"
 resolver = "2"
@@ -16,31 +16,18 @@ rustc-args = ["--cfg", "tvxl_docsrs"]
 [badges]
 maintenance = { status = "experimental" }
 
-[features]
-default = ["serde"]
-
 [dependencies]
 flagset = "0.4"
 num = "0.4"
 transvoxel-data = "0.2"
-serde = { version = "1.0", optional = true, features = ["derive"] }
-bevy = { version = "0.15", optional = true }
-bytemuck = { version = "1.21.0", optional = true }
 
 [dev-dependencies]
 hamcrest2 = "0.3.0"
-ndarray = "0.16.1"
-bevy = { version = "0.15.3", features = ["dynamic_linking"] }
-bevy_egui = "0.33.0"
-#bevy_screen_diags = "0.4.0"
+bevy = { version = "0.17", features = ["dynamic_linking"] }
+bevy_egui = "0.38.0"
 noise = "0.9.0"
 rand = "0.9.0"
+ordered-float = "5.1.0"
 
 [profile.dev]
 opt-level = 3
-
-[[example]]
-name = "single_block"
-
-[[example]]
-name = "transition_across_blocks"

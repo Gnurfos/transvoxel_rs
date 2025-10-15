@@ -1,95 +1,52 @@
-/*!
-This is the main algorithm implementation.
+use crate::structs::block_star_view::BlockStarView;
+use crate::structs::grid_point::GridPoint;
+use crate::structs::vertex_index::VertexIndex;
+use crate::traits::coordinate::Coordinate;
+use crate::traits::voxel_block::VoxelBlock;
+use crate::traits::voxel_data::VoxelData;
 
-At it's heart it's simply:
- 1 - for each regular cell, extract its geometry with marching cubes
- 2 - for each transition face in the request, extract each transition cell of the face
-Both extractions are similar:
- - get densities for all the 8 or 9 voxels of the cell
- - compute the case and class, from densities
- - get triangulation info from the case/class
- - output vertices from that
-
-Some complexity lies in the details:
- - understanding the compact data present in tables
- - reuse of vertices from a previous cell when available
- - shrinking of the regular cells to make room for one or several transition cells. This is not systematic for all voxels of the cell (see `can_shrink`)
- - rotations: the algorithm is explained, and the tables are provided only for one transition face of the block (LowZ). For others, we need to apply a mapping to switch between XYZ and UVW coordinates
-
-Terminology:
- - a `voxel` is a point on the densities grid. They are evenly spaced for a given resolution. Densities will be queried for voxels
- - a `grid point` is a  point ou our morphed grid. They will be used for output: a vertex is generated between 2 grid points
-
- For most regular cells, the 8 voxels and 8 grid points coincide.
- For a regular cell touching one transition face of the block, 4 of the grid points will be shifted toward the inside of the block and not coincide with their origin voxels anymore
- For a regular cell touching two transition faces, 6 such grid points are shifted away from their voxel
- For a regular cell touching three transition faces, 7 grid points are shifted
-
-Known room for improvements:
- - we never place a vertex exactly on a grid point. Since a vertex would only appear between greid points when one density is above the threshold and the other below, they should be different. If the densities are too close, we will place a verted in the middle of the grid points. As a consequence, we don't make use of TRANSITION_CORNER_DATA (illustrated in 4.19 in Lengyel's paper), which handles the reusing of previous cell vertex in the case the vertex is positionned exactly on a voxel
- - `transition_grid_point_on_low_res_face` calls `regular_grid_point` which will recalculate a grid point that was already calculated for the associated regular cell, and could be reused instead
- - actually grid points on the low res face always go in pairs (no case produces a vertex between the high res face and the low res face), and the vertex itself generated between them could be reused
- - a lot of things are probably copied, that should not
- */
-
-use super::density_caching::PreCachingVoxelSource;
-
-use super::super::mesh_builder::*;
-use super::super::traits::*;
-use super::super::transition_sides::*;
-use super::super::voxel_coordinates::*;
-use super::super::voxel_source::*;
+use super::super::traits::mesh_builder::*;
+use crate::implementation::voxel_coordinates::*;
+use crate::structs::position::OutputPosition;
 use super::aux_tables::*;
 use super::rotation::*;
 use super::tables_wrapper::*;
+use crate::traits::voxel_data::Density;
 
-/*
-A point on the grid, for output purposes.
-This is not necessarily at the same place as a Voxel sample, because grid points can be shifted ("shrink")
-*/
-
-pub struct Extractor<'b, C, V, S, M>
+pub struct Extractor<'b, C, V, CentralBlock, DenserNeighbourBlock, M>
 where
     C: Coordinate,
     V: VoxelData,
-    S: VoxelSource<V>,
+    CentralBlock: VoxelBlock<C, V>,
+    DenserNeighbourBlock: VoxelBlock<C, V>,
     M: MeshBuilder<V, C>,
 {
-    density_source: PreCachingVoxelSource<V, S>,
-    block: &'b Block<C>,
+    blocks: &'b BlockStarView<C, V, CentralBlock, DenserNeighbourBlock>,
     threshold: V::Density,
-    transition_sides: TransitionSides,
-    //vertices: usize,
-    //vertices_positions: Vec<C>,
-    //vertices_normals: Vec<C>,
-    //tri_indices: Vec<usize>,
     mesh_builder: M,
     shared_storage: SharedVertexIndices,
     current_rotation: &'static Rotation,
 }
 
-impl<'b, C, V, S, M> Extractor<'b, C, V, S, M>
+impl<'b, C, V, CentralBlock, DenserNeighbourBlock, M> Extractor<'b, C, V, CentralBlock, DenserNeighbourBlock, M>
 where
     C: Coordinate,
     V: VoxelData,
-    S: VoxelSource<V>,
+    CentralBlock: VoxelBlock<C, V>,
+    DenserNeighbourBlock: VoxelBlock<C, V>,
     M: MeshBuilder<V, C>,
 {
     pub fn new(
-        density_source: S,
-        block: &'b Block<C>,
+        blocks: &'b BlockStarView<C, V, CentralBlock, DenserNeighbourBlock>,
         threshold: V::Density,
-        transition_sides: TransitionSides,
         mesh_builder: M,
     ) -> Self {
-        Extractor::<'b, C, V, S, M> {
-            density_source: PreCachingVoxelSource::new(density_source, block.subdivisions),
-            block,
+        let subdivisions = blocks.central().block().subdivisions;
+        Extractor::<'b, C, V, CentralBlock, DenserNeighbourBlock, M> {
+            blocks,
             threshold,
-            transition_sides,
-            //vertices: 0,
             mesh_builder,
-            shared_storage: SharedVertexIndices::new(block.subdivisions),
+            shared_storage: SharedVertexIndices::new(subdivisions),
             current_rotation: Rotation::default(),
         }
     }
@@ -101,9 +58,10 @@ where
     }
 
     fn extract_regular_cells(&mut self) {
-        for cell_x in 0..self.block.subdivisions {
-            for cell_y in 0..self.block.subdivisions {
-                for cell_z in 0..self.block.subdivisions {
+        let subdivisions = self.blocks.central().block().subdivisions;
+        for cell_x in 0..subdivisions {
+            for cell_y in 0..subdivisions {
+                for cell_z in 0..subdivisions {
                     let cell_index = RegularCellIndex {
                         x: cell_x,
                         y: cell_y,
@@ -118,12 +76,6 @@ where
     fn extract_regular_cell(&mut self, cell_index: RegularCellIndex) {
         let case_number = self.regular_cell_case(&cell_index);
         let cell_class: u8 = transvoxel_data::regular_cell_data::REGULAR_CELL_CLASS[case_number];
-        if cell_class != 0 {
-            // To optimize, we could also check if the cell is on a border of the block, here
-            // we only need voxels out of the block when such a cell generates vertices, because
-            // these are for vertex normals
-            self.density_source.load_regular_extended_voxels();
-        }
         let triangulation_info =
             transvoxel_data::regular_cell_data::REGULAR_CELL_DATA[cell_class as usize];
         let vertices_data = transvoxel_data::regular_cell_data::REGULAR_VERTEX_DATA[case_number];
@@ -147,12 +99,11 @@ where
     }
 
     fn extract_transition_cells(&mut self) {
-        self.density_source
-            .load_transition_voxels(self.transition_sides);
-        for side in self.transition_sides {
+        for side in self.blocks.transition_sides().into_iter() {
             self.current_rotation = Rotation::for_side(side);
-            for cell_u in 0..self.block.subdivisions {
-                for cell_v in 0..self.block.subdivisions {
+            let subdivisions = self.blocks.central().block().subdivisions;
+            for cell_u in 0..subdivisions {
+                for cell_v in 0..subdivisions {
                     let cell_index = TransitionCellIndex::from(side, cell_u, cell_v);
                     self.extract_transition_cell(&cell_index);
                 }
@@ -201,7 +152,7 @@ where
         for (i, deltas) in REGULAR_CELL_VOXELS.iter().enumerate() {
             let voxel_index = cell_index + deltas;
             let inside = self
-                .regular_voxel_data(&voxel_index)
+                .regular_voxel_data(voxel_index)
                 .density()
                 .inside(&self.threshold);
             if inside {
@@ -215,7 +166,7 @@ where
         let mut case: usize = 0;
         for (voxel_delta, contribution) in TRANSITION_HIGH_RES_FACE_CASE_CONTRIBUTIONS.iter() {
             let voxel_index = cell_index + voxel_delta;
-            let density = self.transition_grid_point_data(&voxel_index).density();
+            let density = self.transition_grid_point_data(voxel_index).density();
             let inside = density.inside(&self.threshold);
             if inside {
                 case += contribution;
@@ -224,18 +175,14 @@ where
         case
     }
 
-    fn regular_voxel_data(&mut self, voxel_index: &RegularVoxelIndex) -> V {
-        self.density_source.get_data(voxel_index)
+    fn regular_voxel_data(&mut self, voxel_index: RegularVoxelIndex) -> V {
+        self.blocks.central().get(voxel_index)
     }
 
-    fn transition_grid_point_data(&mut self, voxel_index: &HighResolutionVoxelIndex) -> V {
-        if voxel_index.on_regular_grid() {
-            let regular_index =
-                voxel_index.as_regular_index(self.current_rotation, self.block.subdivisions);
-            self.density_source.get_data(&regular_index)
-        } else {
-            self.density_source.get_transition_data(voxel_index)
-        }
+    fn transition_grid_point_data(&mut self, voxel_index: HighResolutionVoxelIndex) -> V {
+        let index_in_block = voxel_index.as_higher_res_neighbour_block_index(self.blocks.central().block().subdivisions);
+        let block = self.blocks.neighbour_at(voxel_index.cell.side);
+        block.get(index_in_block)
     }
 
     // Either creates or reuses an existing vertex. Returns its index in the vertices buffer
@@ -347,7 +294,7 @@ where
     fn regular_grid_point(&mut self, voxel_index: RegularVoxelIndex) -> GridPoint<V, C> {
         let position = self.regular_grid_point_position(&voxel_index);
         let gradient = self.regular_voxel_gradient(&voxel_index);
-        let voxel_data = self.regular_voxel_data(&voxel_index);
+        let voxel_data = self.regular_voxel_data(voxel_index);
         GridPoint {
             position,
             gradient,
@@ -355,15 +302,9 @@ where
         }
     }
 
-    fn regular_grid_point_position(&self, voxel_index: &RegularVoxelIndex) -> Position<C> {
-        let mut x = self.block.dims.base[0]
-            + self.block.dims.size * C::from_ratio(voxel_index.x, self.block.subdivisions);
-        let mut y = self.block.dims.base[1]
-            + self.block.dims.size * C::from_ratio(voxel_index.y, self.block.subdivisions);
-        let mut z = self.block.dims.base[2]
-            + self.block.dims.size * C::from_ratio(voxel_index.z, self.block.subdivisions);
-        self.shrink_if_needed(&mut x, &mut y, &mut z, voxel_index);
-        Position { x, y, z }
+    fn regular_grid_point_position(&self, voxel_index: &RegularVoxelIndex) -> OutputPosition<C> {
+        let central_block = self.blocks.central().block();
+        central_block.morphed_voxel_position(*voxel_index, self.blocks.transition_sides())
     }
 
     fn regular_voxel_gradient(
@@ -371,24 +312,24 @@ where
         voxel_index: &RegularVoxelIndex,
     ) -> (V::Density, V::Density, V::Density) {
         let xgradient = self
-            .regular_voxel_data(&(voxel_index + RegularVoxelDelta { x: 1, y: 0, z: 0 }))
+            .regular_voxel_data(voxel_index + RegularVoxelDelta { x: 1, y: 0, z: 0 })
             .density()
             .diff(
-                self.regular_voxel_data(&(voxel_index + RegularVoxelDelta { x: -1, y: 0, z: 0 }))
+                self.regular_voxel_data(voxel_index + RegularVoxelDelta { x: -1, y: 0, z: 0 })
                     .density(),
             );
         let ygradient = self
-            .regular_voxel_data(&(voxel_index + RegularVoxelDelta { x: 0, y: 1, z: 0 }))
+            .regular_voxel_data(voxel_index + RegularVoxelDelta { x: 0, y: 1, z: 0 })
             .density()
             .diff(
-                self.regular_voxel_data(&(voxel_index + RegularVoxelDelta { x: 0, y: -1, z: 0 }))
+                self.regular_voxel_data(voxel_index + RegularVoxelDelta { x: 0, y: -1, z: 0 })
                     .density(),
             );
         let zgradient = self
-            .regular_voxel_data(&(voxel_index + RegularVoxelDelta { x: 0, y: 0, z: 1 }))
+            .regular_voxel_data(voxel_index + RegularVoxelDelta { x: 0, y: 0, z: 1 })
             .density()
             .diff(
-                self.regular_voxel_data(&(voxel_index + RegularVoxelDelta { x: 0, y: 0, z: -1 }))
+                self.regular_voxel_data(voxel_index + RegularVoxelDelta { x: 0, y: 0, z: -1 })
                     .density(),
             );
         (xgradient, ygradient, zgradient)
@@ -417,7 +358,7 @@ where
     ) -> GridPoint<V, C> {
         let rot = self.current_rotation;
         let voxel_index =
-            rot.to_regular_voxel_index(self.block.subdivisions, cell_index, face_u, face_v);
+            rot.to_regular_voxel_index(self.blocks.central().block().subdivisions, cell_index, face_u, face_v);
         self.regular_grid_point(voxel_index)
     }
 
@@ -429,7 +370,7 @@ where
         let voxel_index = cell_index + &delta;
         let position = self.high_res_face_grid_point_position(cell_index, delta);
         let gradient = self.high_res_face_grid_point_gradient(&voxel_index);
-        let voxel_data = self.high_res_face_grid_point_data(&voxel_index);
+        let voxel_data = self.high_res_face_grid_point_data(voxel_index);
         GridPoint {
             position,
             gradient,
@@ -441,11 +382,10 @@ where
         &self,
         cell_index: &TransitionCellIndex,
         delta: HighResolutionVoxelDelta,
-    ) -> Position<C> {
+    ) -> OutputPosition<C> {
         let rot = self.current_rotation;
         let voxel_index = cell_index + &delta;
-        let position_in_block = rot.to_position_in_block(self.block.subdivisions, &voxel_index);
-        &(&position_in_block * self.block.dims.size) + &self.block.dims.base
+        rot.to_position(*self.blocks.central().block(), &voxel_index)
     }
 
     fn high_res_face_grid_point_gradient(
@@ -456,7 +396,7 @@ where
         // even for voxels at the corners of the face (to better match normals with the neighbouring block)
         if base_voxel_index.on_regular_grid() {
             let regular_index =
-                base_voxel_index.as_regular_index(self.current_rotation, self.block.subdivisions);
+                base_voxel_index.as_regular_index(self.current_rotation, self.blocks.central().block().subdivisions);
             self.regular_voxel_gradient(&regular_index)
         } else {
             self.high_res_face_grid_point_gradient_non_regular(base_voxel_index)
@@ -469,30 +409,30 @@ where
     ) -> (V::Density, V::Density, V::Density) {
         let rot = self.current_rotation;
         let x_gradient = self
-            .transition_grid_point_data(&(base_voxel_index + &rot.plus_x_as_uvw))
+            .transition_grid_point_data(base_voxel_index + &rot.plus_x_as_uvw)
             .density()
             .diff(
-                self.transition_grid_point_data(&(base_voxel_index - &rot.plus_x_as_uvw))
+                self.transition_grid_point_data(base_voxel_index - &rot.plus_x_as_uvw)
                     .density(),
             );
         let y_gradient = self
-            .transition_grid_point_data(&(base_voxel_index + &rot.plus_y_as_uvw))
+            .transition_grid_point_data(base_voxel_index + &rot.plus_y_as_uvw)
             .density()
             .diff(
-                self.transition_grid_point_data(&(base_voxel_index - &rot.plus_y_as_uvw))
+                self.transition_grid_point_data(base_voxel_index - &rot.plus_y_as_uvw)
                     .density(),
             );
         let z_gradient = self
-            .transition_grid_point_data(&(base_voxel_index + &rot.plus_z_as_uvw))
+            .transition_grid_point_data(base_voxel_index + &rot.plus_z_as_uvw)
             .density()
             .diff(
-                self.transition_grid_point_data(&(base_voxel_index - &rot.plus_z_as_uvw))
+                self.transition_grid_point_data(base_voxel_index - &rot.plus_z_as_uvw)
                     .density(),
             );
         (x_gradient, y_gradient, z_gradient)
     }
 
-    fn high_res_face_grid_point_data(&mut self, voxel_index: &HighResolutionVoxelIndex) -> V {
+    fn high_res_face_grid_point_data(&mut self, voxel_index: HighResolutionVoxelIndex) -> V {
         self.transition_grid_point_data(voxel_index)
     }
 
@@ -501,47 +441,17 @@ where
         point_a: GridPoint<V, C>,
         point_b: GridPoint<V, C>,
     ) -> VertexIndex {
-        let interp_toward_b = V::Density::interp(
+        let interpolate_toward_b = Density::interpolate(
             point_a.voxel_data.density(),
             point_b.voxel_data.density(),
             self.threshold,
         );
         self.mesh_builder
-            .add_vertex_between(point_a, point_b, interp_toward_b)
+            .add_vertex_between(point_a, point_b, interpolate_toward_b)
     }
 
-    fn shrink_if_needed(
-        &self,
-        grid_point_x: &mut C,
-        grid_point_y: &mut C,
-        grid_point_z: &mut C,
-        voxel_index: &RegularVoxelIndex,
-    ) {
-        let cell_size = self.block.dims.size * C::from_ratio(1, self.block.subdivisions);
-        shrink_if_needed::<C>(
-            grid_point_x,
-            grid_point_y,
-            grid_point_z,
-            voxel_index.x,
-            voxel_index.y,
-            voxel_index.z,
-            cell_size,
-            self.block.subdivisions,
-            &self.transition_sides,
-        )
-    }
 }
 
-// 0 to 3
-/**
- Reuse index : ![Image](reuse_index.png)
-
-Some code
-```
-let x = 1;
-```
-
-*/
 struct SharedVertexIndices {
     regular: Vec<VertexIndex>,
     transition: Vec<VertexIndex>,
@@ -608,59 +518,3 @@ impl SharedVertexIndices {
     }
 }
 
-/// This function is only made public for our examples, to display the voxel grid. Regular users should not need it
-#[allow(clippy::too_many_arguments)]
-pub fn shrink_if_needed<C: Coordinate>(
-    x: &mut C,
-    y: &mut C,
-    z: &mut C,
-    xi: isize,
-    yi: isize,
-    zi: isize,
-    cell_size: C,
-    subdivisions: usize,
-    transition_sides: &TransitionSides,
-) {
-    let shrink: C = C::shrink_factor() * cell_size;
-    if can_shrink(xi, yi, zi, subdivisions, transition_sides) {
-        if (xi == 0) && (transition_sides.contains(TransitionSide::LowX)) {
-            *x = *x + shrink;
-        } else if (xi as usize == subdivisions)
-            && (transition_sides.contains(TransitionSide::HighX))
-        {
-            *x = *x - shrink;
-        }
-        if (yi == 0) && (transition_sides.contains(TransitionSide::LowY)) {
-            *y = *y + shrink;
-        } else if (yi as usize == subdivisions)
-            && (transition_sides.contains(TransitionSide::HighY))
-        {
-            *y = *y - shrink;
-        }
-        if (zi == 0) && (transition_sides.contains(TransitionSide::LowZ)) {
-            *z = *z + shrink;
-        } else if (zi as usize == subdivisions)
-            && (transition_sides.contains(TransitionSide::HighZ))
-        {
-            *z = *z - shrink;
-        }
-    }
-}
-
-// Do not shrink grid point (in any direction) if it's close to a face where the other block is rendered at the same
-// (or lower) level of details (ie: not a transition side)
-fn can_shrink(
-    xi: isize,
-    yi: isize,
-    zi: isize,
-    subdivisions: usize,
-    transition_sides: &TransitionSides,
-) -> bool {
-    let dont_shrink = ((xi == 0) && !transition_sides.contains(TransitionSide::LowX))
-        || ((xi == subdivisions as isize) && !transition_sides.contains(TransitionSide::HighX))
-        || ((yi == 0) && !transition_sides.contains(TransitionSide::LowY))
-        || ((yi == subdivisions as isize) && !transition_sides.contains(TransitionSide::HighY))
-        || ((zi == 0) && !transition_sides.contains(TransitionSide::LowZ))
-        || ((zi == subdivisions as isize) && !transition_sides.contains(TransitionSide::HighZ));
-    !dont_shrink
-}

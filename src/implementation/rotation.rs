@@ -1,11 +1,12 @@
 /*!
 Mapping system between XYZ and UVW coordinates
 */
-use crate::mesh_builder::Position;
-use crate::traits::Coordinate;
+use crate::traits::coordinate::Coordinate;
 
-use super::super::transition_sides::*;
-use super::super::voxel_coordinates::*;
+use super::super::structs::transition_sides::*;
+use crate::implementation::voxel_coordinates::*;
+use crate::prelude::Block;
+use crate::structs::position::OutputPosition;
 use super::aux_tables;
 
 #[derive(Debug)]
@@ -55,14 +56,15 @@ impl Rotation {
     /**
     Gives the position of this voxel relative to the block (each coordinate ranging from 0 to 1)
     */
-    pub fn to_position_in_block<F>(
+    pub fn to_position<F>(
         &self,
-        block_size: usize,
+        block: Block<F>,
         voxel_index: &HighResolutionVoxelIndex,
-    ) -> Position<F>
+    ) -> OutputPosition<F>
     where
         F: Coordinate,
     {
+        let block_size = block.subdivisions;
         let cell_index = voxel_index.cell;
         let delta = voxel_index.delta;
         // We multiply by 2 most things to divide in the end, in an attempt to reduce floating point operations (maybe need to measure if this is gaining us anything)
@@ -81,7 +83,11 @@ impl Rotation {
             + self.v.z * (2 * cell_index.cell_v as isize + delta.v)
             + self.w.z * delta.w;
         let z = F::half(z) * F::from_ratio(1, block_size);
-        Position { x, y, z }
+        OutputPosition {
+            x: block.base[0] + block.size * x,
+            y: block.base[1] + block.size * y,
+            z: block.base[2] + block.size * z,
+        }
     }
 
     pub fn to_regular_voxel_index(

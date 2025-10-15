@@ -3,9 +3,14 @@ This module contains mesh builders to produce [Bevy](https://bevyengine.org/) me
 */
 
 use bevy::asset::RenderAssetUsages;
-use bevy::render::mesh::Mesh;
+use bevy::mesh::Indices;
+use bevy::prelude::Mesh;
 use bevy::render::render_resource::PrimitiveTopology::{LineList, TriangleList};
-use transvoxel::{mesh_builder::*, traits::*};
+use transvoxel::structs::grid_point::GridPoint;
+use transvoxel::structs::vertex_index::VertexIndex;
+use transvoxel::traits::voxel_data::VoxelData;
+use transvoxel::traits::mesh_builder::MeshBuilder;
+use transvoxel::traits::voxel_data::Density;
 
 #[derive(Default)]
 pub struct BevyMeshBuilder {
@@ -25,7 +30,7 @@ impl BevyMeshBuilder {
     */
     pub fn build(self) -> Mesh {
         let mut bevy_mesh = Mesh::new(TriangleList, RenderAssetUsages::default());
-        let indices = bevy::render::mesh::Indices::U32(self.triangle_indices);
+        let indices = Indices::U32(self.triangle_indices);
         bevy_mesh.insert_indices(indices);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, self.positions);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals);
@@ -43,7 +48,7 @@ impl BevyMeshBuilder {
             .flat_map(|i| vec![3 * i, 3 * i + 1, 3 * i + 1, 3 * i + 2, 3 * i + 2, 3 * i])
             .map(|j| self.triangle_indices[j])
             .collect();
-        let indices = bevy::render::mesh::Indices::U32(indices);
+        let indices = Indices::U32(indices);
         bevy_mesh.insert_indices(indices);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, self.positions);
         bevy_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals);
@@ -59,17 +64,17 @@ where
         &mut self,
         point_a: GridPoint<V, f32>,
         point_b: GridPoint<V, f32>,
-        interp_toward_b: f32,
+        interpolate_toward_b: f32,
     ) -> VertexIndex {
         let position = point_a
             .position
-            .interp_toward(&point_b.position, interp_toward_b);
+            .interpolate_toward(&point_b.position, interpolate_toward_b);
         let gradient_x =
-            point_a.gradient.0 + interp_toward_b * (point_b.gradient.0 - point_a.gradient.0);
+            point_a.gradient.0 + interpolate_toward_b * (point_b.gradient.0 - point_a.gradient.0);
         let gradient_y =
-            point_a.gradient.1 + interp_toward_b * (point_b.gradient.1 - point_a.gradient.1);
+            point_a.gradient.1 + interpolate_toward_b * (point_b.gradient.1 - point_a.gradient.1);
         let gradient_z =
-            point_a.gradient.2 + interp_toward_b * (point_b.gradient.2 - point_a.gradient.2);
+            point_a.gradient.2 + interpolate_toward_b * (point_b.gradient.2 - point_a.gradient.2);
         let normal = f32::gradients_to_normal(gradient_x, gradient_y, gradient_z);
         self.positions.push([position.x, position.y, position.z]);
         self.normals.push(normal);

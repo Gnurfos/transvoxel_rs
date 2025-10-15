@@ -1,58 +1,46 @@
+use std::cell::RefCell;
 use std::env;
 
-use crate::extraction::extract_from_fn;
-use crate::generic_mesh::*;
-use crate::transition_sides::*;
+use crate::extraction::extract;
+use crate::structs::generic_mesh::*;
+use crate::structs::transition_sides::*;
 use crate::unit_tests::test_utils::*;
-use crate::{
-    extraction::extract,
-    voxel_source::{VoxelSource, WorldMappingVoxelSource},
-};
-use crate::{
-    voxel_coordinates::{HighResolutionVoxelIndex, RegularVoxelIndex},
-    voxel_source::*,
-};
 use bevy::math::f32;
 use flagset::Flags;
 use hamcrest2::prelude::*;
 use rand::prelude::*;
 use rand::rng;
 use rand::Rng;
+use crate::structs::block::Block;
+use crate::structs::block_star_view::BlockStarView;
+use crate::traits::data_field::DataField;
 
-#[test]
-fn it_works() {
-    assert_eq!(2 + 2, 4);
-}
 
 #[test]
 fn empty_extraction() {
-    let mut f = DensityArray::<f32>::new(10);
-    let b = Block::from([0.0, 0.0, 0.0], 10.0, 10);
-    let m = GenericMeshBuilder::new();
-    let m = extract(&mut f, &b, 0.5, no_side(), m).build();
+    let f = TestField::new([0.0, 0.0, 0.0], 10.0, 10);
+    let m = f.extract(0.5).build();
     assert_that!(m.num_tris(), equal_to(0));
 }
 
 #[test]
 fn one_cube_corner_gives_one_triangle() {
-    let mut f = DensityArray::<f32>::new(1);
-    f.set(0, 0, 0, 1f32);
-    let b = Block::from([0.0, 0.0, 0.0], 1.0, 1);
-    let m = GenericMeshBuilder::new();
-    let m = extract(&mut f, &b, 0.5, no_side(), m).build();
+    let mut f = TestField::new([0.0, 0.0, 0.0], 1.0, 1);
+    f.set(0.0, 0.0, 0.0);
+    let m = f.extract(0.5).build();
     assert_that!(
         m.tris(),
         tris!(tri_matcher(0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5))
     );
 }
 
+
+
 #[test]
 fn another_one_cube_corner() {
-    let mut f = DensityArray::<f32>::new(3);
-    f.set(3, 0, 0, 1f32);
-    let b = Block::from([0.0, 0.0, 0.0], 3.0, 3);
-    let m = GenericMeshBuilder::new();
-    let m = extract(&mut f, &b, 0.5, no_side(), m).build();
+    let mut f = TestField::new([0.0, 0.0, 0.0], 3.0, 3);
+    f.set(3.0, 0.0, 0.0);
+    let m = f.extract(0.5).build();
     assert_that!(
         m.tris(),
         tris!(tri_matcher(2.5, 0.0, 0.0, 3.0, 0.0, 0.5, 3.0, 0.5, 0.0))
@@ -61,12 +49,10 @@ fn another_one_cube_corner() {
 
 #[test]
 fn two_corners_give_two_triangles_in_one_cube() {
-    let mut f = DensityArray::<f32>::new(1);
-    f.set(0, 0, 0, 1f32);
-    f.set(1, 0, 0, 1f32);
-    let b = Block::from([0.0, 0.0, 0.0], 1.0, 1);
-    let m = GenericMeshBuilder::new();
-    let m = extract(&mut f, &b, 0.5, no_side(), m).build();
+    let mut f = TestField::new([0.0, 0.0, 0.0], 1.0, 1);
+    f.set(0.0, 0.0, 0.0);
+    f.set(1.0, 0.0, 0.0);
+    let m = f.extract(0.5).build();
     assert_that!(
         m.tris(),
         tris!(
@@ -79,15 +65,13 @@ fn two_corners_give_two_triangles_in_one_cube() {
 #[test]
 fn basic_normals() {
     // Extract a flat square (constant z), the normals should point to +Z
-    let mut f = DensityArray::<f32>::new(1);
+    let mut f = TestField::new([0.0, 0.0, 0.0], 1.0, 1);
     for x in -1..3 {
         for y in -1..3 {
-            f.set(x, y, 0, 1f32);
+            f.set(x as f32, y as f32, 0.0);
         }
     }
-    let b = Block::from([0.0, 0.0, 0.0], 1.0, 1);
-    let m = GenericMeshBuilder::new();
-    let m = extract(&mut f, &b, 0.5, no_side(), m).build();
+    let m = f.extract(0.5).build();
     #[rustfmt::skip]
     assert_that!(
         m.tris(),
@@ -107,24 +91,20 @@ fn basic_normals() {
 #[test]
 fn ambiguous_case() {
     // First cell
-    let mut f = DensityArray::<f32>::new(1);
-    f.set(0, 0, 0, 1f32);
-    f.set(0, 0, 1, 1f32);
-    f.set(0, 1, 0, 1f32);
-    f.set(0, 1, 1, 1f32);
-    f.set(1, 1, 0, 1f32);
-    f.set(1, 0, 1, 1f32);
-    let b = Block::from([0.0, 0.0, 0.0], 1.0, 1);
-    let m = GenericMeshBuilder::new();
-    let m = extract(&mut f, &b, 0.5, no_side(), m).build();
+    let mut f = TestField::new([0.0, 0.0, 0.0], 1.0, 1);
+    f.set(0.0, 0.0, 0.0);
+    f.set(0.0, 0.0, 1.0);
+    f.set(0.0, 1.0, 0.0);
+    f.set(0.0, 1.0, 1.0);
+    f.set(1.0, 1.0, 0.0);
+    f.set(1.0, 0.0, 1.0);
+    let m = f.extract(0.5).build();
     assert_that!(m.tris().len(), equal_to(4));
-    // Second cell (+x from the first one)
-    let mut f = DensityArray::<f32>::new(1);
-    f.set(0, 1, 0, 1f32);
-    f.set(0, 0, 1, 1f32);
-    let b = Block::from([1.0, 1.0, 1.0], 1.0, 1);
-    let m = GenericMeshBuilder::new();
-    let m = extract(&mut f, &b, 0.5, no_side(), m).build();
+    // Second cell (+x+y+z from the first one)
+    let mut f = TestField::new([1.0, 1.0, 1.0], 1.0, 1);
+    f.set(1.0, 2.0, 1.0);
+    f.set(1.0, 1.0, 2.0);
+    let m = f.extract(0.5).build();
     #[rustfmt::skip]
     assert_that!(
         m.tris(),
@@ -141,14 +121,13 @@ fn ambiguous_case() {
     );
 }
 
+
 #[test]
 fn vertices_are_reused_within_a_cell() {
-    let mut f = DensityArray::<f32>::new(1);
-    f.set(0, 0, 0, 1f32);
-    f.set(1, 0, 0, 1f32);
-    let b = Block::from([0.0, 0.0, 0.0], 1.0, 1);
-    let m = GenericMeshBuilder::new();
-    let m = extract(&mut f, &b, 0.5, no_side(), m).build();
+    let mut f = TestField::new([0.0, 0.0, 0.0], 1.0, 1);
+    f.set(0.0, 0.0, 0.0);
+    f.set(1.0, 0.0, 0.0);
+    let m = f.extract(0.5).build();
     assert_that!(m.tris().len(), equal_to(2));
     // 2 vertices should be reused to form a quad between the 2 triangles
     // => Total only 4 vertices instead of 6
@@ -158,12 +137,10 @@ fn vertices_are_reused_within_a_cell() {
 
 #[test]
 fn vertices_are_reused_between_cells() {
-    let mut f = DensityArray::<f32>::new(2);
-    f.set(0, 2, 2, 1f32);
-    f.set(1, 2, 2, 1f32);
-    let b = Block::from([0.0, 0.0, 0.0], 2.0, 2);
-    let m = GenericMeshBuilder::new();
-    let m = extract(&mut f, &b, 0.5, no_side(), m).build();
+    let mut f = TestField::new([0.0, 0.0, 0.0], 2.0, 2);
+    f.set(0.0, 2.0, 2.0);
+    f.set(1.0, 2.0, 2.0);
+    let m = f.extract(0.5).build();
     assert_that!(m.tris().len(), equal_to(3));
     // 2 vertices should be reused to form a quad between the 2 triangles of the first cell
     // 2 vertices should be reused too between cells
@@ -175,24 +152,20 @@ fn vertices_are_reused_between_cells() {
 #[test]
 fn trivial_transition_cell() {
     // Field left empty
-    let mut f = DensityArray::<f32>::new(10);
-    let b = Block::from([0.0, 0.0, 0.0], 10.0, 10);
-    let transition_sides = TransitionSide::LowZ.into();
-    let m = extract_from_grid(&mut f, &b, 0.5, transition_sides);
+    let f = TestField::new([0.0, 0.0, 0.0], 10.0, 10);
+    let m = f.extract2(0.5, TransitionSide::LowZ.into()).build();
     assert_that!(m.tris().len(), equal_to(0));
 }
 
 #[test]
 fn simplest_transition_cell() {
-    let mut f = DensityArray::<f32>::new(10);
+    let mut f = TestField::new([0.0, 0.0, 0.0], 100.0, 10);
     // We need cells in the middle of a transition block face, to ensure actual cell shrinking, so the "simplest" is not so simple
     // This produces 4 "quarters" of a pyramid (viewed from z-top)
     //  q2 q1
     //  q3 q4
-    f.set(5, 5, 0, 1f32);
-    let b = Block::from([0.0, 0.0, 0.0], 100.0, 10);
-    let transition_sides = TransitionSide::LowZ.into();
-    let m = extract_from_grid(&mut f, &b, 0.5, transition_sides);
+    f.set(50.0, 50.0, 0.0);
+    let m = f.extract2(0.5, TransitionSide::LowZ.into()).build();
     // assert_that!(
     //     m.tris().len(),
     //     equal_to(12)
@@ -259,15 +232,10 @@ fn simplest_transition_cell() {
 
 #[test]
 fn simple_transition_cell() {
-    let mut f = DensityArray::<f32>::new(3);
-    f.set(1, 1, 0, 1f32);
-    // These go together, this is bad, they describe the same voxel requested by 2 different cells
-    f.set_inter(TransitionSide::LowZ, 1, 1, 0, 1, 0, 1f32);
-    f.set_inter(TransitionSide::LowZ, 0, 1, 2, 1, 0, 1f32);
-
-    let b = Block::from([0.0, 0.0, 0.0], 30.0, 3);
-    let transition_sides = TransitionSide::LowZ.into();
-    let m = extract_from_grid(&mut f, &b, 0.5, transition_sides);
+    let mut f = TestField::new([0.0, 0.0, 0.0], 30.0, 3);
+    f.set(10.0, 10.0, 0.0);
+    f.set(10.0, 15.0, 0.0);
+    let m = f.extract2(0.5, TransitionSide::LowZ.into()).build();
     let v_top = (10.0, 10.0, 5.75);
     let q1v2 = (15f32, 10f32, 1.5f32); // Between the transition and the regular sub-cells
     let q1v3 = (10f32, 15f32, 1.5f32); // Between the transition and the regular sub-cells
@@ -286,12 +254,10 @@ fn simple_transition_cell() {
 }
 
 #[test]
-fn simplest_transition_cezzzzll_non_negative_z() {
-    let mut f = DensityArray::<f32>::new(3);
-    f.set(0, 1, 1, 1f32);
-    let b = Block::from([0.0, 0.0, 0.0], 30.0, 3);
-    let transition_sides = TransitionSide::LowX.into();
-    let m = extract_from_grid(&mut f, &b, 0.5, transition_sides);
+fn simplest_transition_cell_non_negative_z() {
+    let mut f = TestField::new([0.0, 0.0, 0.0], 30.0, 3);
+    f.set(0.0, 10.0, 10.0);
+    let m = f.extract2(0.5, TransitionSide::LowX.into()).build();
     let v_top = (5.75, 10.0, 10.0);
 
     let q1v2 = (1.5f32, 15f32, 10f32); // Between the transition and the regular sub-cells
@@ -315,21 +281,18 @@ fn simple_sphere() {
     // Radius = 5, that is with threshold 0, density is 0 at 5 and 15, positive between them, negative outside
     struct Sphere;
     impl DataField<f32, f32> for Sphere {
-        fn get_data(&mut self, x: f32, y: f32, z: f32) -> f32 {
+        fn get_data(&self, x: f32, y: f32, z: f32) -> f32 {
             let distance_from_center =
                 ((x - 10f32) * (x - 10f32) + (y - 10f32) * (y - 10f32) + (z - 10f32) * (z - 10f32))
                     .sqrt();
             1f32 - distance_from_center / 5f32
         }
     }
-    let block = Block::from([0.0, 0.0, 0.0], 20.0, 2);
-    let source = WorldMappingVoxelSource {
-        field: Sphere {},
-        block: &block,
-    };
+    let block = Block::new([0.0, 0.0, 0.0], 20.0, 2);
     let threshold = 0f32;
     let m = GenericMeshBuilder::new();
-    let m = extract(source, &block, threshold, no_side(), m).build();
+    let blocks = BlockStarView::new_relaying_to_field(&Sphere, block, &TransitionSide::none());
+    let m = extract(&blocks, threshold, m).build();
 
     let v_plus_x = (15.0, 10.0, 10.0);
     let v_minus_x = (5.0, 10.0, 10.0);
@@ -353,91 +316,6 @@ fn simple_sphere() {
     );
 }
 
-struct CountingField<'b, S> {
-    pub calls: usize,
-    underlying: WorldMappingVoxelSource<'b, S, f32>,
-}
-impl<'b, S> CountingField<'b, S> {
-    pub fn new(source: S, block: &'b Block<f32>) -> Self {
-        let underlying = WorldMappingVoxelSource::<'b, S, f32> {
-            field: source,
-            block,
-        };
-        Self {
-            calls: 0,
-            underlying,
-        }
-    }
-    pub fn count(&self) -> usize {
-        self.calls
-    }
-}
-#[allow(unused_variables)]
-impl<S> VoxelSource<f32> for CountingField<'_, S>
-where
-    S: DataField<f32, f32>,
-{
-    fn get_regular_voxel(&mut self, voxel_index: &RegularVoxelIndex) -> f32 {
-        self.calls += 1;
-        self.underlying.get_regular_voxel(voxel_index)
-    }
-
-    fn get_transition_voxel(&mut self, index: &HighResolutionVoxelIndex) -> f32 {
-        self.calls += 1;
-        self.underlying.get_transition_voxel(index)
-    }
-}
-
-#[test]
-fn count_density_calls_minimal() {
-    // Block with just 1 subdivision and empty
-    let block = Block::from([0.0, 0.0, 0.0], 10.0, 1);
-    // Regular
-    let mut source = CountingField::new(|_, _, _| 0.0, &block);
-    let m = GenericMeshBuilder::new();
-    extract(&mut source, &block, 0.5, no_side(), m);
-    // Just query each voxel once for finding the case
-    assert_that!(source.count(), equal_to(8));
-    // With one transition
-    let mut source = CountingField::new(|_, _, _| 0.0, &block);
-    let m = GenericMeshBuilder::new();
-    extract(&mut source, &block, 0.5, TransitionSide::LowX.into(), m);
-    // Just query each voxel once for finding the case, but needs the high-res- face voxels too
-    assert_that!(source.count(), equal_to(13));
-    // With two transition sides
-    let mut source = CountingField::new(|_, _, _| 0.0, &block);
-    let m = GenericMeshBuilder::new();
-    extract(
-        &mut source,
-        &block,
-        0.5,
-        TransitionSide::LowX | TransitionSide::LowZ,
-        m,
-    );
-    // Just query each voxel once for finding the case, but needs the 2 high-res face voxels too
-    assert_that!(source.count(), equal_to(18));
-}
-
-#[test]
-fn count_density_calls_random() {
-    // Block with 3 subdivision and random
-    let block = Block::from([0.0, 0.0, 0.0], 10.0, 3);
-    // Regular
-    let mut source = CountingField::new(&|_, _, _| rand::random(), &block);
-    let m = GenericMeshBuilder::new();
-    extract(&mut source, &block, 0.5, no_side(), m);
-    // Min: 4x4x4 for determining the case
-    // Max: 4x4x4 for the case + 6x4x4 (extending outside in each of the 6 directions, for each of the  4x4 voxels on the side)
-    assert_that!(source.count(), greater_than_or_equal_to(4 * 4 * 4));
-    assert_that!(source.count(), less_than_or_equal_to(4 * 4 * 4 + 6 * 4 * 4));
-    // With one transition
-    let mut source = CountingField::new(&|_, _, _| rand::random(), &block);
-    let m = GenericMeshBuilder::new();
-    extract(&mut source, &block, 0.5, TransitionSide::LowX.into(), m);
-    // We're not very good here currently, difficult to assert
-    // ...
-}
-
 #[test]
 fn random_data() {
     // Just to get some small confidence that it doesn't crash
@@ -448,11 +326,15 @@ fn random_data() {
     println!("Using seed {}", seed);
     let mut rng = StdRng::seed_from_u64(seed);
     let subdivisions = rng.random_range(2..30);
-    let block = Block::from([0.0, 0.0, 0.0], 10.0, subdivisions);
+    let rng2 = RefCell::new(StdRng::seed_from_u64(rng.next_u64()));
+    let block = Block::new([0.0, 0.0, 0.0], 10.0, subdivisions);
     let sides = random_sides(&mut rng);
-    let source = |_, _, _| rng.random_range(-1.0..1.0);
+    let source = |_, _, _| {
+        rng2.borrow_mut().random_range(-1.0..1.0)
+    };
     let m = GenericMeshBuilder::new();
-    let m = extract_from_fn(source, &block, 0.5, sides, m).build();
+    let blocks = BlockStarView::new_relaying_to_field(&source, block, &sides);
+    let m = extract(&blocks, 0.5, m).build();
     println!(
         "Extracted mesh with {} tris for sides {:?}",
         m.num_tris(),
@@ -461,7 +343,7 @@ fn random_data() {
 }
 
 fn random_sides(rng: &mut StdRng) -> TransitionSides {
-    let mut sides = no_side();
+    let mut sides = TransitionSide::none();
     for s in TransitionSide::LIST {
         if rng.random_bool(0.5) {
             let ss: TransitionSides = (*s).into();
@@ -471,6 +353,8 @@ fn random_sides(rng: &mut StdRng) -> TransitionSides {
     sides
 }
 
+
+
 #[test]
 fn test_regular_cache_extended_loaded() {
     // A 3x3x3 block with low X as transition side (x == 0.0)
@@ -478,12 +362,12 @@ fn test_regular_cache_extended_loaded() {
     //  -> the regular cell at 0, 1, 1 will produce nothing
     //  -> the corresponding transition cell (lowX, u=1, v=1) will produce something (case #2, 2 triangles)
     //  -> one of the produced vertices will need to evaluate the density gradient at (0.0, 1.0, 1.0), and
-    //  for this access the density at (-1, 1, 1), which is on a the regular voxels grid. In earlier versions
-    // of the aglorithm, this failed because the extended regular grid data was only loaded/accessible if a
+    //  for this access the density at (-1, 1, 1), which is on the regular voxels grid. In earlier versions
+    // of the algorithm, this failed because the extended regular grid data was only loaded/accessible if a
     // regular cell needed it
     let subdivisions = 3;
     let size = 3.0;
-    let block = Block::from([0.0, 0.0, 0.0], size, subdivisions);
+    let block = Block::new([0.0, 0.0, 0.0], size, subdivisions);
     let sides = TransitionSide::LowX.into();
     let source = |x: f32, y: f32, z: f32| {
         if ((x - 0.0).abs() > f32::EPSILON)
@@ -495,10 +379,12 @@ fn test_regular_cache_extended_loaded() {
         }
     };
     let m = GenericMeshBuilder::new();
-    let m = extract_from_fn(source, &block, 0.5, sides, m).build();
+    let blocks = BlockStarView::new_relaying_to_field(&source, block, &sides);
+    let m = extract(&blocks, 0.5, m).build();
     println!(
         "Extracted mesh with {} tris for sides {:?}",
         m.num_tris(),
         sides
     );
 }
+

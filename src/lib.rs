@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 /*!
 
 This is an implementation of Eric Lengyel's Transvoxel Algorithm in Rust
@@ -23,14 +24,10 @@ To implement a fully consistent dynamic level-of-detail system, you will also pr
 
 Currently, it is not possible to "flip" a transition face status on a block, without re-extracting a new mesh for the block. Which means changing the resolution for one block can cascade through constraints to re-generating a few other blocks as well
 
-# New in version 1.0.0
- * complete rework of the interfaces. Notably: you can now implement a [MeshBuilder] yourself
- * removal of the `bevy_mesh` feature: There is code in our examples with various mesh builders for bevy
-
 # Basic usage
 Either try calling one of the functions in [extraction], or follow the example below:
 ```rust
-// The first thing you need is a density provider. You can implement a DataField for that
+// The first thing you need is a density provider. You can implement a [DataField] for that
 // but a simpler way, if you are just experimenting, is to use a function:
 
 fn sphere_density(x: f32, y: f32, z: f32) -> f32 {
@@ -40,7 +37,7 @@ fn sphere_density(x: f32, y: f32, z: f32) -> f32 {
 // Going along with your density function, you need a threshold value for your density:
 // This is the value for which the surface will be generated. You can typically choose 0.
 // Values over the threshold are considered inside the volume, and values under the threshold
-// outside of the volume. In our case, we will have a density of 0 on a sphere centered on the
+// outside the volume. In our case, we will have a density of 0 on a sphere centered on the
 // world center, of radius 5.
 let threshold = 0f32;
 
@@ -51,27 +48,44 @@ let threshold = 0f32;
 // obtained simply by providing some sides instead (that is shown a bit later):
 use transvoxel::prelude::*;
 let subdivisions = 10;
-let block = Block::from([0.0, 0.0, 0.0], 10.0, subdivisions);
-let transition_sides = transition_sides::no_side();
-
+let block = Block::new([0.0, 0.0, 0.0], 10.0, subdivisions);
+let transition_sides = TransitionSide::none();
 // Finally, you can run the mesh extraction:
-use transvoxel::generic_mesh::GenericMeshBuilder;
 let builder = GenericMeshBuilder::new();
-let builder = extract_from_field(&sphere_density, &block, threshold, transition_sides, builder);
+let builder = extract_from_field(
+    &sphere_density,
+    FieldCaching::CacheNothing,
+    block,
+    transition_sides,
+    threshold,
+    builder
+);
 let mesh = builder.build();
 assert!(mesh.tris().len() == 103);
-
 // Extracting with some transition faces results in a slightly more complex mesh:
-use transition_sides::TransitionSide::LowX;
+use TransitionSide::LowX;
 let builder = GenericMeshBuilder::new();
-let builder = extract_from_field(&sphere_density, &block, threshold, LowX.into(), builder);
+let builder = extract_from_field(
+    &sphere_density,
+    FieldCaching::CacheNothing,
+    block,
+    LowX.into(),
+    threshold,
+    builder
+);
 let mesh = builder.build();
 assert!(mesh.tris().len() == 131);
-
 // Unless, of course, the surface does not cross that face:
-use transvoxel::transition_sides::TransitionSide::HighZ;
+use TransitionSide::HighZ;
 let builder = GenericMeshBuilder::new();
-let builder = extract_from_field(&sphere_density, &block, threshold, HighZ.into(), builder);
+let builder = extract_from_field(
+    &sphere_density,
+    FieldCaching::CacheNothing,
+    block,
+    HighZ.into(),
+    threshold,
+    builder
+);
 let mesh = builder.build();
 assert!(mesh.tris().len() == 103);
 ```
@@ -121,16 +135,18 @@ Extracted mesh: Mesh {
 It is made of 4 vertices, arranged in 2 triangles.
 The first vertex is at position x=10.0, y=5.0, z=0.0 (the first 3 floats in position).
 As the first in the list, it's index is 0, and we can see it is used in the 2 triangles
-(the first triangle uses vertices 0 1 2, and the second triangle vertices 0 2 3)
+(the first triangle uses vertices 0 1 2, and the second triangle vertices 0 2 3).
+This is what you get when you use the [GenericMeshBuilder], but you can and probably should
+use your own [MeshBuilder]. If you're using bevy, we have an implementation in our examples code.
 
 
 # How to request transition sides
 ```rust
-use transvoxel::transition_sides::{TransitionSide, no_side};
+use transvoxel::structs::transition_sides::TransitionSide;
 
 // If you don't hardcode sides like in the example above, you can build a set of sides incrementally:
 // They use the FlagSet crate
-let mut sides = no_side();
+let mut sides = TransitionSide::none();
 sides |= TransitionSide::LowX;
 sides |= TransitionSide::HighY;
 
@@ -138,36 +154,72 @@ assert!(sides.contains(TransitionSide::LowX));
 assert!(!sides.contains(TransitionSide::HighX));
 ```
 
-# Limitations / possible improvements
- * Provide a way to extract without normals, or with face normals, which would be much faster
- * Output/Input positions/normals are only f32. It should be feasible easily to extend that to f64
- * Voxel densities caching is sub-optimal: probably only in the case of an empty block will densities be queried only once per voxel. In non-empty blocks, densities are very likely to be queried several times for some voxels
- * Algorithm improvements. See [Algorithm]
+# Realistic and efficient caching of the density field
+The examples above do not perform any caching, for simplicity's sake.
+Which means that the density function will be called potentially (probably)
+several (many) times for the same voxel position. This is probably not suitable
+for a real use case, especially if your density function is not cheap.
 
-[Algorithm]: crate::implementation::algorithm
-[Density]: crate::density::Density
+The idiomatic way of handling that is to call the slightly more advanced [extract] function,
+and to provide it a [BlockStarView].
+
+Say you want to extract for these 2 blocks:
+```
+use transvoxel::prelude::*;
+let b1 = Block::new([0.0, 0.0, 0.0], 10.0, 16);
+let b2 = Block::new([10.0, 0.0, 0.0], 10.0, 32); // Or b2 = b1.high_res_neighbour_to(HighX);
+```
+There will be 2 calls to `extract`, so caching has to be done externally, by hand.
+We provide [VoxelVecBlock] for that, but if this way of storing things is not suitable, you
+can implement your own [VoxelBlock] to do something similar.
+```
+# use transvoxel::prelude::*;
+let density_function = |x, y, z| z;
+let threshold = 0.0;
+# let b1 = Block::new([0.0, 0.0, 0.0], 10.0, 16);
+# let b2 = Block::new([10.0, 0.0, 0.0], 10.0, 32);
+// Cache each block separately
+let cached_b1 = VoxelVecBlock::cache(&density_function, b1);
+let cached_b2 = VoxelVecBlock::cache(&density_function, b2);
+// Now just use views into the cached blocks, to reuse data across `extract` calls:
+// We use `&VoxelVecBlock` here. You can use anything that implements [VoxelBlock]
+type View<'a> = BlockStarView<f32, f32, &'a VoxelVecBlock<f32, f32>, &'a VoxelVecBlock<f32, f32>>;
+let mesh1 = extract(
+    &View::new_simple(&cached_b1).with_neighbour(&cached_b2, TransitionSide::HighX),
+    threshold,
+    GenericMeshBuilder::new()
+).build();
+let mesh2 = extract(
+    &View::new_simple(&cached_b2),
+    threshold,
+    GenericMeshBuilder::new()
+).build();
+```
+
+
+[Algorithm]: implementation::algorithm
 [Float]: num::Float
-[MeshBuilder]: crate::mesh_builder::MeshBuilder
-
+[MeshBuilder]: traits::mesh_builder::MeshBuilder
+[GenericMeshBuilder]: structs::generic_mesh::GenericMeshBuilder
+[BlockStarView]: structs::block_star_view::BlockStarView
+[VoxelVecBlock]: structs::voxel_blocks::VoxelVecBlock
+[VoxelBlock]: traits::voxel_block::VoxelBlock
+[extract]: extraction::extract
 */
-#![warn(missing_docs)]
 #![allow(rustdoc::private_intra_doc_links)]
 
 #[cfg(test)]
 mod unit_tests;
 
-pub mod extraction;
-pub mod generic_mesh;
-pub mod mesh_builder;
 pub mod prelude;
 pub mod traits;
-pub mod transition_sides;
-pub mod voxel_coordinates;
-pub mod voxel_source;
+pub mod structs;
+
+pub mod extraction;
 
 mod implementation;
-pub use implementation::algorithm::shrink_if_needed;
 
-#[cfg(feature = "serde")]
-#[macro_use]
-extern crate serde;
+/// These functions are only made public for some of our tests/examples. A regular use should not need them.
+pub mod private {
+    pub use super::implementation::voxel_coordinates::high_res_voxel_index_to_position as _internal_high_res_voxel_index_to_position;
+}

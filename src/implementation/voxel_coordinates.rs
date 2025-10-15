@@ -17,7 +17,7 @@ For addressing them, we do not use the world global XYZ system:
 For each of the six faces of the block, a rotated UVW system is defined and used, where UV
 are coordinates along the face (from an origin also defined by the face), and W is perpendicular
 to the face (with +W toward the inside of the cube). W is used to address voxels only, as cells
-faces just need UV to be positionned within the block face.
+faces just need UV to be positioned within the block face.
 
 For cells UV, 1 unit is 1 cell (ex +1U moves to the next cell in the U direction).
 Voxels UVW (`HighResolutionVoxelDelta`) start at the UV base of the cell, and 1 unit is half the length of a face. (ex +1U +1V is in the middle of the face)
@@ -27,12 +27,13 @@ See [Rotation] for the definitions of UVW for each side of the block.
 */
 use std::ops::{Add, Sub};
 
-use crate::traits::Coordinate;
+use crate::traits::coordinate::Coordinate;
 
-use super::implementation::rotation::Rotation;
-use super::mesh_builder::Position;
-use super::transition_sides::TransitionSide;
-use super::voxel_source::Block;
+use crate::implementation::rotation::Rotation;
+use crate::prelude::TransitionSide;
+use crate::structs::block::Block;
+use crate::structs::position::OutputPosition;
+pub use crate::structs::voxel_index::VoxelIndex as RegularVoxelIndex;
 
 /// Coordinates of a regular cell within the block. Go from 0 to BLOCK_SIZE - 1
 #[derive(Debug, PartialEq)]
@@ -56,16 +57,6 @@ pub struct RegularVoxelDelta {
     pub z: isize,
 }
 
-/// Index of a regular voxel relative to a block. It can refer to a voxel outside of the block, as we need to reach farther out to compute normals
-#[derive(Debug, PartialEq)]
-pub struct RegularVoxelIndex {
-    /// X-index. From -1 to `subdivisions` + 1 (included)
-    pub x: isize,
-    /// Y-index. From -1 to `subdivisions` + 1 (included)
-    pub y: isize,
-    /// Z-index. From -1 to `subdivisions` + 1 (included)
-    pub z: isize,
-}
 
 impl Add<&RegularVoxelDelta> for &RegularCellIndex {
     type Output = RegularVoxelIndex;
@@ -125,7 +116,7 @@ pub struct HighResolutionVoxelDelta {
 }
 
 /// Index of a high resolution voxel within a block
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct HighResolutionVoxelIndex {
     /// Cell within the block
     pub cell: TransitionCellIndex,
@@ -169,17 +160,8 @@ impl HighResolutionVoxelIndex {
         rotation.to_regular_voxel_index(block_subdivisions, &self.cell, cell_u, cell_v)
     }
 
-    /// Convert to a relative x, y, z position within the block (0,0,0 being at the block origin, 1,1,1 at the opposite max end)
-    pub fn to_position_in_block<F>(&self, block: &Block<F>) -> Position<F>
-    where
-        F: Coordinate,
-    {
-        let rotation = Rotation::for_side(self.cell.side);
-        rotation.to_position_in_block(block.subdivisions, self)
-    }
-
     /// `self` being a double-resolution voxel on a transition face in this block, it coincides with a regular voxel on the neighbouring block at that face. This gives that voxel's index within that block
-    pub fn to_higher_res_neighbour_block_index(&self, this_block_size: usize) -> RegularVoxelIndex {
+    pub fn as_higher_res_neighbour_block_index(&self, this_block_size: usize) -> RegularVoxelIndex {
         let higher_res_block_size = this_block_size as isize * 2;
         let cell = self.cell;
         let delta = self.delta;
@@ -246,4 +228,26 @@ impl Sub<&HighResolutionVoxelDelta> for &HighResolutionVoxelIndex {
             ),
         }
     }
+}
+
+/// Convert a high resolution voxel index (destructured) to a float position.
+pub fn high_res_voxel_index_to_position<F: Coordinate>(
+    block: Block<F>,
+    transition_side: TransitionSide,
+    cell_u: usize,
+    cell_v: usize,
+    u: isize,
+    v: isize,
+    w: isize,
+) -> OutputPosition<F> {
+    let rotation = Rotation::for_side(transition_side);
+    let index = HighResolutionVoxelIndex::from(
+        transition_side,
+        cell_u,
+        cell_v,
+        u,
+        v,
+        w,
+    );
+    rotation.to_position(block, &index)
 }

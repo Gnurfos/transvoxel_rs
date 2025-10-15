@@ -1,44 +1,25 @@
 /*!
-   Traits and storage facilities used by the extraction algorithm
+   Traits for defining voxel data and density
 */
 
 use num::Float;
 
-/**
-Trait that must be implemented for coordinates (x/y/z)
-It mostly has to be a float with a few conversions from integers
-*/
-pub trait Coordinate: Float {
-    /**
-    A value of this type representing the ratio a / b
-    */
-    fn from_ratio(a: isize, b: usize) -> Self;
 
-    /**
-    A value of this type representing a / 2
-    */
-    fn half(a: isize) -> Self;
-
-    /**
-    What portion of a cell space is reserved for placing transition cells (ex/typically 0.15)
-    This is part of the trait rather than a constant or parameter, because we need this value in the correct type
-    */
-    fn shrink_factor() -> Self;
-}
-
-/// Trait that a type must implement to be used as voxel data (return values of a [VoxelSource], used as input by the algorithm).
+/// Trait that a type must implement to be used as voxel data (return values of a [DataField] or [VoxelBlock]).
 /// Anything can be stored, but the type has to provide a float density for the algorithm to work with.
 /// Any additional data stored can be used by a custom [MeshBuilder].
 ///
-/// [MeshBuilder]: crate::mesh_builder::MeshBuilder
-/// [VoxelSource]: crate::voxel_source::VoxelSource
-pub trait VoxelData: Default + Clone + Copy {
+/// [MeshBuilder]: crate::traits::mesh_builder::MeshBuilder
+/// [DataField]: crate::traits::data_field::DataField
+/// [VoxelBlock]: crate::traits::voxel_block::VoxelBlock
+pub trait VoxelData {
     /// The type that acts as density
     type Density: Density;
     /// How to get the density from a given data object
     fn density(&self) -> Self::Density;
 }
 
+/// A [Density] by itself can act as [VoxelData] (no need to attach additional data).
 impl<F: Density> VoxelData for F {
     type Density = Self;
     fn density(&self) -> Self::Density {
@@ -55,7 +36,7 @@ pub trait Density: Default + Clone + Copy + Float {
         self > threshold
     }
 
-    /// Epsilon value (use for float comparisons)
+    /// Epsilon value (used for float comparisons)
     const EPSILON: Self;
     /// Value for 0.5
     const HALF: Self;
@@ -63,7 +44,7 @@ pub trait Density: Default + Clone + Copy + Float {
     const ZERO: Self;
 
     /// Interpolate to determine where between A and B the threshold is crossed
-    fn interp(a: Self, b: Self, threshold: Self) -> Self {
+    fn interpolate(a: Self, b: Self, threshold: Self) -> Self {
         if (b - a).abs() > Self::EPSILON {
             (threshold - a) / (b - a)
         } else {
@@ -88,26 +69,6 @@ pub trait Density: Default + Clone + Copy + Float {
     }
 }
 
-macro_rules! float_impl_coordinate {
-    ($T:ident) => {
-        impl Coordinate for $T {
-            fn from_ratio(a: isize, b: usize) -> Self {
-                (a as $T) / (b as $T)
-            }
-
-            fn half(a: isize) -> Self {
-                0.5 * (a as $T)
-            }
-
-            fn shrink_factor() -> Self {
-                0.15
-            }
-        }
-    };
-}
-
-float_impl_coordinate!(f32);
-float_impl_coordinate!(f64);
 
 macro_rules! float_impl_density {
     ($T:ident) => {

@@ -4,10 +4,12 @@ use bevy::color::palettes::css;
 use bevy::input::{mouse::MouseButtonInput, ButtonState};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
+use bevy::mesh::Mesh as BevyMesh;
+
 use bevy_egui::egui::SliderClamping::Always;
-use transvoxel::transition_sides::*;
-use transvoxel::voxel_source::{Block, BlockDims};
+use transvoxel::extraction::extract;
+use transvoxel::structs::transition_sides::*;
 
 #[path = "../shared/models.rs"]
 mod models;
@@ -26,48 +28,11 @@ mod utils;
 #[path = "../shared/flycam.rs"]
 mod flycam;
 use flycam::{FlyCamera, FlyCameraPlugin};
-
-fn blocks_to_show(
-    base_subdivisions: usize,
-    with_transitions: bool,
-) -> [(Block<f32>, flagset::FlagSet<TransitionSide>); 3] {
-    [
-        (
-            Block {
-                dims: BlockDims {
-                    base: [0.0, 0.0, 0.0],
-                    size: 10.0,
-                },
-                subdivisions: base_subdivisions,
-            },
-            if with_transitions {
-                TransitionSide::LowX | TransitionSide::LowZ
-            } else {
-                no_side()
-            },
-        ),
-        (
-            Block {
-                dims: BlockDims {
-                    base: [-10.0, 0.0, 0.0],
-                    size: 10.0,
-                },
-                subdivisions: base_subdivisions * 2,
-            },
-            no_side(),
-        ),
-        (
-            Block {
-                dims: BlockDims {
-                    base: [0.0, 0.0, -10.0],
-                    size: 10.0,
-                },
-                subdivisions: base_subdivisions * 2,
-            },
-            no_side(),
-        ),
-    ]
-}
+use transvoxel::prelude::BlockStarView;
+use transvoxel::structs::block::Block;
+use transvoxel::structs::voxel_blocks::VoxelVecBlock;
+use crate::bevy_mesh::BevyMeshBuilder;
+use crate::models::models_map;
 
 fn setup(
     mut commands: Commands,
@@ -76,7 +41,7 @@ fn setup(
     mats_cache: ResMut<MaterialsResource>,
     mut primary_window_query: Query<&mut Window, With<PrimaryWindow>>,
 ) {
-    primary_window_query.single_mut().title = "Transvoxel example".to_string();
+    primary_window_query.single_mut().unwrap().title = "Transvoxel example".to_string();
     load_materials(&mut materials, mats_cache);
     spawn_background(&mut commands, &mut meshes, &mut materials);
     spawn_light(&mut commands);
@@ -166,22 +131,47 @@ fn spawn_camera(commands: &mut Commands) {
         });
     }
 
-    fn add_initial_model(mut channel: EventWriter<AppEvent>) {
-        channel.send(AppEvent::LoadModel);
+    fn add_initial_model(mut channel: MessageWriter<AppEvent>) {
+        channel.write(AppEvent::LoadModel);
     }
 
     fn load_model(
         commands: &mut Commands,
         meshes: &mut ResMut<Assets<Mesh>>,
+        blocks: &mut ResMut<Blocks>,
         mats_cache: &Res<MaterialsResource>,
         model_params: &ModelParams,
     ) {
         let wireframe = model_params.wireframe;
-        for (block, transition_sides) in
-            &blocks_to_show(model_params.subdivisions, model_params.with_transitions)
-        {
-            let bevy_mesh =
-                utils::mesh_for_model(&model_params.model, wireframe, block, transition_sides);
+        let central_block = Block::new([0.0, 0.0, 0.0], 10.0, model_params.subdivisions);
+        // Re-store blocks data
+        let models = models_map();
+        let field = models.get(&model_params.model).unwrap();
+        blocks.central.replace(VoxelVecBlock::cache(field.as_ref(), central_block));
+        blocks.lower_x.replace(VoxelVecBlock::cache(field.as_ref(), central_block.high_res_neighbour_to(TransitionSide::LowX)));
+        blocks.lower_z.replace(VoxelVecBlock::cache(field.as_ref(), central_block.high_res_neighbour_to(TransitionSide::LowZ)));
+        // Setup views on these blocks
+        let view_central = if model_params.with_transitions {
+            BlockStarView::new_simple(blocks.central.as_ref().unwrap())
+                .with_neighbour(blocks.lower_x.as_ref().unwrap(), TransitionSide::LowX)
+                .with_neighbour(blocks.lower_z.as_ref().unwrap(), TransitionSide::LowZ)
+        } else {
+            BlockStarView::new_simple(blocks.central.as_ref().unwrap())
+        };
+        let view_lower_x = BlockStarView::new_simple(blocks.lower_x.as_ref().unwrap());
+        let view_lower_z = BlockStarView::new_simple(blocks.lower_z.as_ref().unwrap());
+        // Render these views
+        for view in [view_central, view_lower_x, view_lower_z] {
+            let builder = extract(
+                &view,
+                models::THRESHOLD,
+                BevyMeshBuilder::default(),
+            );
+            let bevy_mesh = if wireframe {
+                builder.build_wireframe()
+            } else {
+                builder.build()
+            };
             let mat = if wireframe {
                 mats_cache.wireframe_model.clone()
             } else {
@@ -200,8 +190,8 @@ fn spawn_camera(commands: &mut Commands) {
                     meshes,
                     mats_cache,
                     model_params,
-                    block,
-                    transition_sides,
+                    &view.central().block,
+                    &view.transition_sides(),
                 );
             }
         }
@@ -215,17 +205,21 @@ fn spawn_camera(commands: &mut Commands) {
         block: &Block<f32>,
         transition_sides: &TransitionSides,
     ) {
-        let grid_mesh = utils::grid_lines(block, transition_sides);
-        commands
-            .spawn((
-                Mesh3d(meshes.add(grid_mesh)),
-                MeshMaterial3d(mats_cache.grid.clone()),
-            ))
-            .insert(ModelMarkerComponent {});
-        let cube = Mesh::from(Cuboid::from_length(1.0));
+        let grid_mesh = utils::grid_line_mesh();
+        let grid_transforms = utils::grid_line_transforms(block, transition_sides);
+        for t in grid_transforms {
+            commands
+                .spawn((
+                    Mesh3d(meshes.add(grid_mesh.clone())),
+                    MeshMaterial3d(mats_cache.grid.clone()),
+                    t,
+                ))
+                .insert(ModelMarkerComponent {});
+        }
+        let cube = BevyMesh::from(Cuboid::from_length(1.0));
         let cube_handle = meshes.add(cube);
         for (x, y, z) in utils::inside_grid_points(&model_params.model, block, transition_sides) {
-            let cell_size = block.dims.size / block.subdivisions as f32;
+            let cell_size = block.size / model_params.subdivisions as f32;
             let point_size = cell_size * 0.05;
             let resize = Transform::from_scale(Vec3::new(point_size, point_size, point_size));
             let rotate = Transform::from_rotation(Quat::from_euler(
@@ -243,35 +237,43 @@ fn spawn_camera(commands: &mut Commands) {
                 ))
                 .insert(ModelMarkerComponent {});
         }
+
     }
 
     #[derive(Component)]
     struct ModelMarkerComponent {}
 
+    #[derive(Default, Resource)]
+    struct Blocks {
+        pub central: Option<VoxelVecBlock<f32, f32>>,
+        pub lower_x: Option<VoxelVecBlock<f32, f32>>,
+        pub lower_z: Option<VoxelVecBlock<f32, f32>>,
+    }
+
     fn main() {
         App::new()
             .add_plugins(DefaultPlugins)
-            .add_plugins((FlyCameraPlugin, EguiPlugin))
-            //.add_plugin(bevy_screen_diags::ScreenDiagsPlugin::default())
+            .add_plugins((FlyCameraPlugin, EguiPlugin::default()))
             .add_systems(Startup, (setup, add_initial_model))
             .init_resource::<UiState>()
             .init_resource::<MaterialsResource>()
-            .add_event::<AppEvent>()
-            .add_systems(Update, (ui, app_events_handler, clicks_handler))
+            .init_resource::<Blocks>()
+            .add_message::<AppEvent>()
+            .add_systems(Update, (app_events_handler, clicks_handler))
+            .add_systems(EguiPrimaryContextPass, ui)
             .run();
     }
 
     fn ui(
-        mut _commands: Commands,
         mut egui_context: EguiContexts,
         mut ui_state: ResMut<UiState>,
-        mut channel: EventWriter<AppEvent>,
+        mut channel: MessageWriter<AppEvent>,
     ) {
         let mut model_changed = false;
         let win = egui::Window::new("Controls");
-        win.show(egui_context.ctx_mut(), |ui| {
+        win.show(egui_context.ctx_mut().unwrap(), |ui| {
             if ui.button("Quit").clicked() {
-                channel.send(AppEvent::Quit);
+                channel.write(AppEvent::Quit);
             }
             ui.label("Arrows/PgUp/PgDn to move the camera\nLeft-click/drag to rotate the camera\nEsc to quit");
             let text = format!("Change model (current: {:?})", ui_state.desired_things.model);
@@ -279,7 +281,7 @@ fn spawn_camera(commands: &mut Commands) {
             egui::ComboBox::from_label(text)
                 .selected_text(format!("{:?}", selected_model))
                 .show_ui(ui, |ui| {
-                    for m in models::Model::iterator() {
+                    for m in Model::iterator() {
                         ui.selectable_value(&mut selected_model, *m, format!("{:?}", m));
                     }
                 });
@@ -311,7 +313,7 @@ fn spawn_camera(commands: &mut Commands) {
             }
 
             if model_changed {
-                channel.send(AppEvent::LoadModel);
+                channel.write(AppEvent::LoadModel);
             }
         });
     }
@@ -360,16 +362,17 @@ fn spawn_camera(commands: &mut Commands) {
         pub grid_dot: Handle<StandardMaterial>,
     }
 
-    #[derive(Event)]
+    #[derive(Event, Message)]
     enum AppEvent {
         LoadModel,
         Quit,
     }
 
     fn app_events_handler(
-        mut events: EventReader<AppEvent>,
+        mut events: MessageReader<AppEvent>,
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
+        mut blocks: ResMut<Blocks>,
         mats_cache: Res<MaterialsResource>,
         models_query: Query<(Entity, &ModelMarkerComponent)>,
         ui_state: Res<UiState>,
@@ -381,7 +384,7 @@ fn spawn_camera(commands: &mut Commands) {
                     for (entity, _) in models_query.iter() {
                         commands.entity(entity).despawn();
                     }
-                    load_model(&mut commands, &mut meshes, &mats_cache, params);
+                    load_model(&mut commands, &mut meshes, &mut blocks, &mats_cache, params);
                 }
                 AppEvent::Quit => {
                     std::process::exit(0);
@@ -390,7 +393,7 @@ fn spawn_camera(commands: &mut Commands) {
         }
     }
 
-    fn clicks_handler(mut events: EventReader<MouseButtonInput>, mut cam_query: Query<&mut FlyCamera>) {
+    fn clicks_handler(mut events: MessageReader<MouseButtonInput>, mut cam_query: Query<&mut FlyCamera>) {
         for event in events.read() {
             if event.button == MouseButton::Left {
                 if event.state == ButtonState::Pressed {

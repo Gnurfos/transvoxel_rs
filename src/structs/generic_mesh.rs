@@ -7,16 +7,15 @@ use std::fmt::Display;
 
 use num::Float;
 
-use crate::mesh_builder::GridPoint;
-use crate::mesh_builder::MeshBuilder;
-use crate::mesh_builder::VertexIndex;
-use crate::traits::Density;
+use crate::structs::grid_point::GridPoint;
+use crate::traits::mesh_builder::MeshBuilder;
+use crate::structs::vertex_index::VertexIndex;
+use crate::traits::voxel_data::Density;
 
 /**
 Mesh
 */
 #[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Mesh<F>
 where
     F: Float,
@@ -27,12 +26,12 @@ where
     pub normals: Vec<F>,
     /**
     Flat vector of the triangle indices. Each consecutive i,j,k define one triangle by 3 indices.
-    Indices are referring to the `positions` and `normals` "triples", so each index is in 0..positions.len()
+    Indices are referring to the `positions` and `normals` "triplets", so each index is in 0..positions.len() / 3
     */
     pub triangle_indices: Vec<usize>,
 }
 
-/// A MeshBuilder that builds Mesh
+/// A MeshBuilder that builds a Mesh
 pub struct GenericMeshBuilder<F>
 where
     F: Float,
@@ -168,17 +167,17 @@ impl MeshBuilder<f32, f32> for GenericMeshBuilder<f32> {
         &mut self,
         point_a: GridPoint<f32, f32>,
         point_b: GridPoint<f32, f32>,
-        interp_toward_b: f32,
+        interpolate_toward_b: f32,
     ) -> VertexIndex {
         let position = point_a
             .position
-            .interp_toward(&point_b.position, interp_toward_b);
+            .interpolate_toward(&point_b.position, interpolate_toward_b);
         let gradient_x =
-            point_a.gradient.0 + interp_toward_b * (point_b.gradient.0 - point_a.gradient.0);
+            point_a.gradient.0 + interpolate_toward_b * (point_b.gradient.0 - point_a.gradient.0);
         let gradient_y =
-            point_a.gradient.1 + interp_toward_b * (point_b.gradient.1 - point_a.gradient.1);
+            point_a.gradient.1 + interpolate_toward_b * (point_b.gradient.1 - point_a.gradient.1);
         let gradient_z =
-            point_a.gradient.2 + interp_toward_b * (point_b.gradient.2 - point_a.gradient.2);
+            point_a.gradient.2 + interpolate_toward_b * (point_b.gradient.2 - point_a.gradient.2);
         let normal = f32::gradients_to_normal(gradient_x, gradient_y, gradient_z);
         self.positions.push(position.x);
         self.positions.push(position.y);

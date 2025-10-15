@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use noise::{Fbm, NoiseFn, Perlin};
+use noise::{NoiseFn, Perlin, RidgedMulti};
 use std::slice::Iter;
-use transvoxel::voxel_source::DataField;
+use transvoxel::traits::data_field::DataField;
 
 #[derive(PartialEq, Debug, Copy, Clone, Hash, Eq)]
 pub enum Model {
@@ -62,7 +62,7 @@ struct Sphere {
 }
 
 impl DataField<f32, f32> for Sphere {
-    fn get_data(&mut self, x: f32, y: f32, z: f32) -> f32 {
+    fn get_data(&self, x: f32, y: f32, z: f32) -> f32 {
         let distance_from_center = ((x - self.cx) * (x - self.cx)
             + (y - self.cy) * (y - self.cy)
             + (z - self.cz) * (z - self.cz))
@@ -74,14 +74,14 @@ impl DataField<f32, f32> for Sphere {
 struct ObliquePlane {}
 impl DataField<f32, f32> for ObliquePlane {
     #[allow(unused_variables)]
-    fn get_data(&mut self, x: f32, y: f32, z: f32) -> f32 {
+    fn get_data(&self, x: f32, y: f32, z: f32) -> f32 {
         2f32 + z - 2f32 * y
     }
 }
 
 struct Wave {}
 impl DataField<f32, f32> for Wave {
-    fn get_data(&mut self, x: f32, y: f32, z: f32) -> f32 {
+    fn get_data(&self, x: f32, y: f32, z: f32) -> f32 {
         2.0 * ((x * 1.0).sin() + 0.5 * (z * 0.5).cos()) + 5.0 - y
     }
 }
@@ -92,13 +92,13 @@ struct Noise {
 impl Noise {
     pub fn new() -> Self {
         Self {
-            f: Box::new(Fbm::<Perlin>::new(0)),
+            f: Box::new(RidgedMulti::<Perlin>::new(0)),
         }
     }
 }
 impl DataField<f32, f32> for Noise {
-    fn get_data(&mut self, x: f32, y: f32, z: f32) -> f32 {
-        let distrub = self.f.get([x as f64, y as f64, z as f64]) as f32;
-        2f32 - 2f32 * (y - 3.0 - 3.0 * distrub)
+    fn get_data(&self, x: f32, y: f32, z: f32) -> f32 {
+        let disturb = self.f.get([x as f64 / 5.0, y as f64 / 5.0, z as f64 / 5.0]) as f32;
+        2f32 - 2f32 * (y - 1.5 - 1.5 * disturb)
     }
 }

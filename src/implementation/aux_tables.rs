@@ -1,5 +1,5 @@
-use super::super::transition_sides::TransitionSide::*;
-use super::super::voxel_coordinates::*;
+use super::super::structs::transition_sides::TransitionSide::*;
+use crate::implementation::voxel_coordinates::*;
 use super::rotation::*;
 
 // Indexed by TransitionSide

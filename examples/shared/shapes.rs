@@ -2,11 +2,12 @@ use bevy::{
     asset::RenderAssetUsages,
     math::{primitives::Cuboid, Vec3},
     prelude::Transform,
+    prelude::Mesh as BevyMesh,
     render::{
-        mesh::{Indices, Mesh as BevyMesh, VertexAttributeValues},
         render_resource::PrimitiveTopology,
     },
 };
+use bevy::mesh::{Indices, VertexAttributeValues};
 
 pub fn create_arrow() -> BevyMesh {
     let shaft = BevyMesh::from(Cuboid::new(1.0, 0.1, 0.1));

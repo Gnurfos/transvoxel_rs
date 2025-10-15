@@ -1,13 +1,16 @@
-use crate::traits::*;
-use crate::voxel_source::Block;
-use crate::{
-    extraction::extract,
-    voxel_coordinates::{HighResolutionVoxelIndex, RegularVoxelIndex},
-};
-use crate::{generic_mesh::*, transition_sides::*, voxel_source::VoxelSource};
-use ndarray::{Array3, Array6};
+use crate::extraction::extract;
+use crate::implementation::voxel_coordinates::RegularVoxelIndex;
+use crate::structs::block::Block;
+use crate::structs::block_star_view::BlockStarView;
+use crate::structs::position::SamplingPosition;
+use crate::traits::voxel_block::VoxelBlock;
+use crate::{structs::generic_mesh::*, structs::transition_sides::*};
+use hamcrest2::core::*;
+use std::cell::RefCell;
 use std::fmt::Debug;
 use std::fmt::Display;
+use std::ops::Sub;
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TriMatcher {
@@ -61,8 +64,8 @@ impl Display for TriMatcher {
     }
 }
 
-impl hamcrest2::core::Matcher<Triangle<f32>> for TriMatcher {
-    fn matches(&self, actual: Triangle<f32>) -> hamcrest2::core::MatchResult {
+impl Matcher<Triangle<f32>> for TriMatcher {
+    fn matches(&self, actual: Triangle<f32>) -> MatchResult {
         let tris_match = if self.match_normals {
             same_pos_and_normal
         } else {
@@ -282,7 +285,7 @@ impl Display for TrianglesMatcher {
     }
 }
 
-use hamcrest2::core::*;
+
 impl Matcher<Vec<Triangle<f32>>> for TrianglesMatcher {
     fn matches(&self, actual: Vec<Triangle<f32>>) -> MatchResult {
         let mut rem = actual.clone();
@@ -347,122 +350,49 @@ pub fn restrict(
     tris.into_iter().filter(fully_in_cube).collect()
 }
 
-/**
-BLOCK_SIZE means there are that many cells across every dimension
-ex: BLOCK_SIZE=3 means a 3x3x3 cells block, thus storing 4x4x4 density points for the block itself
-The points outside of this (-1 and BLOCK_SIZE + 1 can be accessed for gradients) are also allocated, resulting in a 5x5x5 array
-*/
-pub struct DensityArray<D>
-where
-    D: Density + Default,
-{
-    data: Array3<D>,
-    inter_data: Array6<D>,
+pub struct TestField {
+    dense_points: Vec<(f32, f32, f32)>,
+    block: Block<f32>,
+    calls: RefCell<usize>,
 }
 
-impl<D> DensityArray<D>
-where
-    D: Density + Default,
-{
-    pub fn set(&mut self, cell_x: isize, cell_y: isize, cell_z: isize, value: D) {
-        self.data[[
-            (cell_x + 1) as usize,
-            (cell_y + 1) as usize,
-            (cell_z + 1) as usize,
-        ]] = value;
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn set_inter(
-        &mut self,
-        side: TransitionSide,
-        cell_u: usize,
-        cell_v: usize,
-        du: isize,
-        dv: isize,
-        dw: isize,
-        value: D,
-    ) {
-        let i = [
-            side as usize,
-            cell_u,
-            cell_v,
-            (du + 1) as usize,
-            (dv + 1) as usize,
-            (dw + 1) as usize,
-        ];
-        self.inter_data[i] = value;
-    }
-
-    fn get_inter(
-        &self,
-        side: TransitionSide,
-        cell_u: usize,
-        cell_v: usize,
-        du: isize,
-        dv: isize,
-        dw: isize,
-    ) -> D {
-        let i = [
-            side as usize,
-            cell_u,
-            cell_v,
-            (du + 1) as usize,
-            (dv + 1) as usize,
-            (dw + 1) as usize,
-        ];
-        self.inter_data[i]
-    }
-}
-
-impl<D: Density> VoxelSource<D> for DensityArray<D> {
-    fn get_regular_voxel(&mut self, voxel_index: &RegularVoxelIndex) -> D {
-        self.data[[
-            (voxel_index.x + 1) as usize,
-            (voxel_index.y + 1) as usize,
-            (voxel_index.z + 1) as usize,
-        ]]
-    }
-
-    #[allow(unused_variables, unused_mut)]
-    fn get_transition_voxel(&mut self, index: &HighResolutionVoxelIndex) -> D {
-        let side = index.cell.side;
-        if (index.delta.u % 2 != 0) || (index.delta.v % 2 != 0) {
-            return self.get_inter(
-                side,
-                index.cell.cell_u,
-                index.cell.cell_v,
-                index.delta.u,
-                index.delta.v,
-                index.delta.w,
-            );
-        }
-        // Both u and v were even. We should only be called for non regular voxels, so w should be non-zero
-        assert!(
-            index.delta.w != 0,
-            "get_transition_density was called for a regular voxel"
-        );
-        // This is for computing a gradient
-        // Then return whatever because we don't care about normals in this implementation
-        D::default()
-    }
-}
-
-impl<D: Default + Density> DensityArray<D> {
-    pub fn new(block_size: usize) -> Self {
-        DensityArray {
-            data: Array3::<D>::default((block_size + 3, block_size + 3, block_size + 3)),
-            inter_data: Array6::<D>::default((6, block_size, block_size, 5, 5, 5)),
+impl TestField {
+    pub fn new(base: [f32; 3], size: f32, subdivisions: usize) -> Self {
+        Self {
+            block: Block::new(base, size, subdivisions),
+            dense_points: Vec::new(),
+            calls: RefCell::new(0),
         }
     }
+    pub fn set(&mut self, x: f32, y: f32, z: f32) {
+        self.dense_points.push((x, y, z));
+    }
+    pub fn extract2(&self, threshold: f32, transition_sides: TransitionSides) -> GenericMeshBuilder<f32> {
+        let b = GenericMeshBuilder::new();
+        let field = |x, y, z| self.sample(x, y, z);
+        let blocks = BlockStarView::new_relaying_to_field(&field, self.block, &transition_sides);
+        extract(&blocks, threshold, b)
+    }
+    pub fn extract(&self, threshold: f32) -> GenericMeshBuilder<f32> {
+        self.extract2(threshold, TransitionSide::none())
+    }
+    pub fn sample(&self, x: f32, y: f32, z: f32) -> f32 {
+        *self.calls.borrow_mut() += 1;
+        if self.dense_points.iter().any(|(px, py, pz)| (x.sub(px).abs() < f32::EPSILON) && (y.sub(py).abs() < f32::EPSILON) && (z.sub(pz).abs() < f32::EPSILON)) {
+            1.0
+        } else {
+            0.0
+        }
+    }
+
 }
 
-pub fn extract_from_grid(
-    field: &mut DensityArray<f32>,
-    block: &Block<f32>,
-    threshold: f32,
-    transition_sides: TransitionSides,
-) -> Mesh<f32> {
-    let builder = GenericMeshBuilder::new();
-    extract(field, block, threshold, transition_sides, builder).build()
+impl VoxelBlock<f32, f32> for TestField {
+    fn block(&self) -> &Block<f32> {
+        &self.block
+    }
+    fn get(&self, index: RegularVoxelIndex) -> f32 {
+        let SamplingPosition {x, y, z} = self.block.original_voxel_position(index);
+        self.sample(x, y, z)
+    }
 }

@@ -1,19 +1,24 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::input::{mouse::MouseButtonInput, ButtonState};
+use bevy::mesh::Indices;
 use bevy::prelude::Mesh as BevyMesh;
 use bevy::prelude::*;
 use bevy::render::render_resource::PrimitiveTopology::TriangleList;
 
 use bevy::window::PrimaryWindow;
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use transvoxel::mesh_builder::{GridPoint, MeshBuilder, VertexIndex};
-use transvoxel::traits::{Density, VoxelData};
-use transvoxel::transition_sides::no_side;
+use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
+use transvoxel::extraction::{extract_from_field, FieldCaching::*};
+use transvoxel::structs::grid_point::GridPoint;
+use transvoxel::structs::vertex_index::VertexIndex;
+use transvoxel::traits::voxel_data::VoxelData;
+use transvoxel::traits::mesh_builder::MeshBuilder;
+use transvoxel::traits::voxel_data::Density;
 
 #[path = "../shared/flycam.rs"]
 mod flycam;
 use flycam::{FlyCamera, FlyCameraPlugin};
-use transvoxel::voxel_source::Block;
+use transvoxel::structs::transition_sides::TransitionSide;
+use transvoxel::structs::block::Block;
 
 fn setup(
     mut commands: Commands,
@@ -23,7 +28,7 @@ fn setup(
     mut primary_window_query: Query<&mut Window, With<PrimaryWindow>>,
     ambient_light: ResMut<AmbientLight>,
 ) {
-    primary_window_query.single_mut().title = "Transvoxel example".to_string();
+    primary_window_query.single_mut().unwrap().title = "Transvoxel example".to_string();
     load_materials(&mut materials, &mut mats_cache);
     spawn_light(&mut commands, ambient_light);
     spawn_camera(&mut commands);
@@ -107,7 +112,7 @@ impl CustomMeshBuilder {
     pub fn build(self) -> BevyMesh {
         let mut bevy_mesh = BevyMesh::new(TriangleList, RenderAssetUsages::default());
         let converted_indices: Vec<u32> = self.triangle_indices.iter().map(|i| *i as u32).collect();
-        let indices = bevy::render::mesh::Indices::U32(converted_indices);
+        let indices = Indices::U32(converted_indices);
         bevy_mesh.insert_indices(indices);
         bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_POSITION, self.positions);
         bevy_mesh.insert_attribute(BevyMesh::ATTRIBUTE_NORMAL, self.normals);
@@ -121,17 +126,17 @@ impl MeshBuilder<CustomVoxelData, f32> for CustomMeshBuilder {
         &mut self,
         point_a: GridPoint<CustomVoxelData, f32>,
         point_b: GridPoint<CustomVoxelData, f32>,
-        interp_toward_b: <CustomVoxelData as VoxelData>::Density,
+        interpolate_toward_b: <CustomVoxelData as VoxelData>::Density,
     ) -> VertexIndex {
         let position = point_a
             .position
-            .interp_toward(&point_b.position, interp_toward_b);
+            .interpolate_toward(&point_b.position, interpolate_toward_b);
         let gradient_x =
-            point_a.gradient.0 + interp_toward_b * (point_b.gradient.0 - point_a.gradient.0);
+            point_a.gradient.0 + interpolate_toward_b * (point_b.gradient.0 - point_a.gradient.0);
         let gradient_y =
-            point_a.gradient.1 + interp_toward_b * (point_b.gradient.1 - point_a.gradient.1);
+            point_a.gradient.1 + interpolate_toward_b * (point_b.gradient.1 - point_a.gradient.1);
         let gradient_z =
-            point_a.gradient.2 + interp_toward_b * (point_b.gradient.2 - point_a.gradient.2);
+            point_a.gradient.2 + interpolate_toward_b * (point_b.gradient.2 - point_a.gradient.2);
         let normal = f32::gradients_to_normal(gradient_x, gradient_y, gradient_z);
         let color_a = point_a.voxel_data.material.to_color();
         let color_b = point_b.voxel_data.material.to_color();
@@ -140,10 +145,10 @@ impl MeshBuilder<CustomVoxelData, f32> for CustomMeshBuilder {
             (None, Some(c)) => c, // At the limit something-nothing, we want to use the pure something color, and not blend it nor attenuate it
             (Some(c), None) => c, // Idem
             (Some(color_a), Some(color_b)) => [
-                (color_a[0] + interp_toward_b * color_b[0]),
-                (color_a[1] + interp_toward_b * color_b[1]),
-                (color_a[2] + interp_toward_b * color_b[2]),
-                (color_a[3] + interp_toward_b * color_b[3]),
+                color_a[0] * (1.0 - interpolate_toward_b) + interpolate_toward_b * color_b[0],
+                color_a[1] * (1.0 - interpolate_toward_b) + interpolate_toward_b * color_b[1],
+                color_a[2] * (1.0 - interpolate_toward_b) + interpolate_toward_b * color_b[2],
+                color_a[3] * (1.0 - interpolate_toward_b) + interpolate_toward_b * color_b[3],
             ],
         };
         self.positions.push([position.x, position.y, position.z]);
@@ -164,12 +169,12 @@ impl MeshBuilder<CustomVoxelData, f32> for CustomMeshBuilder {
         self.triangle_indices.push(vertex_2_index.0);
         self.triangle_indices.push(vertex_3_index.0);
     }
+
 }
 
 fn field(x: f32, y: f32, z: f32) -> CustomVoxelData {
     // Main ground. Wavy
     let ground_level = 10f32 + 2.0 * (x / 2.0).sin();
-    // let ground_level = 0.0;
     let grass_depth = 2.0;
     // Bubbles of yellow stuff are embedded at regular intervals in the ground
     let bubbles_period = 8.0;
@@ -188,15 +193,13 @@ fn field(x: f32, y: f32, z: f32) -> CustomVoxelData {
         closest_bubble_center.2,
     );
     // A big crater in the middle
-    let hole_radius = 10.0;
-    let hole_center = (5.0, 10.0, 5.0);
+    let hole_radius = 12.0;
+    let hole_center = (5.0, 15.0, 5.0);
     let distance_to_hole = distance(x, y, z, hole_center.0, hole_center.1, hole_center.2);
     // Computations
-    let density = if (distance_to_hole < hole_radius) || (y >= ground_level) {
-        0.0
-    } else {
-        1.0
-    };
+    let hole_density = (distance_to_hole - hole_radius + 0.5).clamp(0.0, 1.0);
+    let wave_density = (ground_level - y + 0.5).clamp(0.0, 1.0);
+    let density = wave_density * hole_density;
     let material = if distance_to_bubble < bubble_radius {
         Material::Metal
     } else if y < ground_level - grass_depth {
@@ -220,7 +223,7 @@ fn load_model(
 ) {
     let subdivisions = 50;
     let block_size = 10f32;
-    let threshold = 0f32;
+    let threshold = 0.5f32;
     for dx in [-1, 0, 1] {
         for dy in [-1, 0, 1] {
             for dz in [-1, 0, 1] {
@@ -229,14 +232,27 @@ fn load_model(
                     dy as f32 * block_size,
                     dz as f32 * block_size,
                 ];
-                let block = Block::from(base, block_size, subdivisions);
-                let mesh_builder = transvoxel::extraction::extract_from_field(
-                    field,
-                    &block,
-                    threshold,
-                    no_side(),
-                    CustomMeshBuilder::default(),
-                );
+                let mesh_builder = if (dx == 1) && (dy == 1) && (dz == 1) {
+                    let block = Block::new(base, block_size, subdivisions / 2);
+                    extract_from_field(
+                        &field,
+                        CacheNothing,
+                        block,
+                        TransitionSide::all(),
+                        threshold,
+                        CustomMeshBuilder::default(),
+                    )
+                } else {
+                    let block = Block::new(base, block_size, subdivisions);
+                    extract_from_field(
+                        &field,
+                        CacheCentralBlockOnly,
+                        block,
+                        TransitionSide::none(),
+                        threshold,
+                        CustomMeshBuilder::default(),
+                    )
+                };
                 let bevy_mesh = mesh_builder.build();
                 let mat = mats_cache.solid_model.clone();
                 commands
@@ -257,17 +273,17 @@ struct ModelMarkerComponent {}
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins((FlyCameraPlugin, EguiPlugin))
-        //.add_plugin(bevy_screen_diags::ScreenDiagsPlugin::default())
+        .add_plugins((FlyCameraPlugin, EguiPlugin::default()))
         .add_systems(Startup, setup)
         .init_resource::<MaterialsResource>()
-        .add_systems(Update, (ui, clicks_handler))
+        .add_systems(Update, clicks_handler)
+        .add_systems(EguiPrimaryContextPass, ui)
         .run();
 }
 
-fn ui(mut _commands: Commands, mut egui_context: EguiContexts) {
+fn ui(mut egui_context: EguiContexts) {
     let win = egui::Window::new("Controls");
-    win.show(egui_context.ctx_mut(), |ui| {
+    win.show(egui_context.ctx_mut().unwrap(), |ui| {
         if ui.button("Quit").clicked() {
             std::process::exit(0);
         }
@@ -280,7 +296,7 @@ struct MaterialsResource {
     pub solid_model: Handle<StandardMaterial>,
 }
 
-fn clicks_handler(mut events: EventReader<MouseButtonInput>, mut cam_query: Query<&mut FlyCamera>) {
+fn clicks_handler(mut events: MessageReader<MouseButtonInput>, mut cam_query: Query<&mut FlyCamera>) {
     for event in events.read() {
         if event.button == MouseButton::Left {
             if event.state == ButtonState::Pressed {
